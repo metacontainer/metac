@@ -1,0 +1,6 @@
+*.capnp.c++
+*.capnp.h
+*.pyc
+__pycache__/
+/build/
+compile_commands.json
