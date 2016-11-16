@@ -4,6 +4,7 @@
 #include <sys/socket.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
 #include <string>
 #include <algorithm>
 #include "metac/kjstreamproxy.h"
@@ -102,14 +103,15 @@ void addrToRaw(kj::Own<kj::NetworkAddress>& address, int port, sockaddr_storage&
 // BoundSocket
 class BoundSocketImpl : public BoundSocket {
     kj::LowLevelAsyncIoProvider& provider;
-    int fd, port;
+    int port;
+    int fd = -1;
 
 public:
-    BoundSocketImpl(kj::LowLevelAsyncIoProvider& provider, int fd, int port): provider(provider), fd(fd), port(port) {
+    BoundSocketImpl(kj::LowLevelAsyncIoProvider& provider, int fd, int port): provider(provider), port(port), fd(fd) {
 
     }
 
-    kj::Promise<kj::Own<kj::AsyncIoStream> > connect(kj::Own<kj::NetworkAddress> address, int port) {
+    kj::Own<Fd> connectAsFd(kj::Own<kj::NetworkAddress> address, int port) {
         KJ_REQUIRE(fd != -1);
 
         sockaddr_storage connectAddr;
@@ -126,8 +128,13 @@ public:
         }
 
         int flag = 1;
-        KJ_SYSCALL (setsockopt(10, SOL_TCP, TCP_NODELAY, &flag, sizeof(flag)));
+        KJ_SYSCALL (setsockopt(fd, SOL_TCP, TCP_NODELAY, &flag, sizeof(flag)));
+        auto retfd = Fd::own(fd);
+        fd = -1;
+        return retfd;
+    }
 
+    kj::Promise<kj::Own<kj::AsyncIoStream> > connect(kj::Own<kj::NetworkAddress> address, int port) {
         auto wrapped = provider.wrapConnectingSocketFd(fd);
         fd = -1; // we no longer own the fd
         return wrapped;
@@ -138,8 +145,10 @@ public:
     }
 
     ~BoundSocketImpl() noexcept {
-        if (fd != -1)
+        if (fd != -1) {
+            KJ_ASSERT(fd != 0);
             close(fd);
+        }
     }
 };
 
@@ -147,8 +156,9 @@ kj::Own<BoundSocket> bindStreamSocket(kj::LowLevelAsyncIoProvider& provider, kj:
     sockaddr_storage bindAddr;
     addrToRaw(address, 0, bindAddr);
 
-    int fd = socket(bindAddr.ss_family, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
-    KJ_REQUIRE (fd > 0, "socket failed", errno);
+    int fd;
+    KJ_SYSCALL (fd = ::socket(bindAddr.ss_family, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0));
+    KJ_REQUIRE (fd > 0, "failed to create socket", errno);
 
     KJ_SYSCALL (bind(fd, (sockaddr*)&bindAddr, sizeof(bindAddr)));
 
@@ -239,7 +249,10 @@ kj::Own<kj::AsyncOutputStream> emptyOutput() {
 Fd::Fd() {}
 
 Fd::~Fd() {
-    if (fd != -1) ::close(fd);
+    if (fd != -1) {
+        KJ_ASSERT(fd != 0); // closing stdio is probably an error
+        ::close(fd);
+    }
 }
 
 int Fd::steal() {
@@ -249,6 +262,7 @@ int Fd::steal() {
 }
 
 kj::Own<Fd> Fd::own(int fd) {
+    KJ_ASSERT (fd > 0);
     auto owner = kj::heap<Fd>();
     owner->fd = fd;
     return owner;
@@ -269,4 +283,13 @@ kj::Own<kj::AsyncInputStream> wrapInputFileFd(kj::AsyncIoProvider& provider, kj:
     return kj::heap<AsyncIoStreamProxy<decltype(pipeThread.thread)> >(std::move(pipeThread.pipe), std::move(pipeThread.thread));
 }
 
+kj::Promise<kj::Own<Fd> > waitUntilConnected(kj::LowLevelAsyncIoProvider& provider, kj::Own<Fd> fd) {
+    int oldFd = fd->fd;
+    int newFd = fcntl(oldFd, F_DUPFD_CLOEXEC, 0);
+    fd->fd = newFd;
+    return provider.wrapConnectingSocketFd(oldFd).then([fdObj{std::move(fd)}](auto socket) mutable {
+        // discards socket
+        return std::move(fdObj);
+    });
+}
 }

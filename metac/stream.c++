@@ -79,6 +79,14 @@ Stream::Client wrapStream(Rc<Instance> instance, kj::Own<kj::AsyncIoStream> stre
 }
 
 kj::Promise<kj::Own<kj::AsyncIoStream> > unwrapStream(Rc<Instance> instance, Stream::Client stream) {
+    return unwrapStreamAsFd(instance, stream).then([instance](auto res) mutable -> kj::Own<kj::AsyncIoStream> {
+        return kj::heap<AsyncIoStreamProxy<Holder::Client> >(
+            instance->getLowLevelIoProvider().wrapSocketFd(res.fd->steal()),
+            res.holder);
+    });
+}
+
+kj::Promise<FdAndHolder> unwrapStreamAsFd(Rc<Instance> instance, Stream::Client stream) {
     std::string selfAddr = instance->getNodeAddress();
 
     auto socket = kjfixes::bindStreamSocket(instance->getLowLevelIoProvider(),
@@ -90,13 +98,15 @@ kj::Promise<kj::Own<kj::AsyncIoStream> > unwrapStream(Rc<Instance> instance, Str
     return req.send().then([instance, socket{std::move(socket)}] (auto res) mutable {
         std::string remoteAddr = res.getLocal().getIp();
         int remotePort = res.getPort();
-        KJ_REQUIRE(remotePort > 1024);
+        KJ_REQUIRE(remotePort >= 32768); // only allow ephemeral ports
         Holder::Client holder = res.getHolder();
         KJ_LOG(INFO, "connecting to", remoteAddr, remotePort);
 
-        return socket->connect(instance->getAddressFromIp(remoteAddr), remotePort).then([holder] (kj::Own<kj::AsyncIoStream> connected) mutable -> kj::Own<kj::AsyncIoStream> {
-            return kj::heap<AsyncIoStreamProxy<Holder::Client> >(std::move(connected), holder);
-        });
+        return kjfixes::waitUntilConnected(instance->getLowLevelIoProvider(), socket->connectAsFd(instance->getAddressFromIp(remoteAddr), remotePort)).
+            then([holder] (kj::Own<kjfixes::Fd> fd) mutable {
+                return FdAndHolder{std::move(fd), holder};
+            });
     });
 }
+
 }

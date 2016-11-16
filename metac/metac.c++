@@ -14,14 +14,16 @@ class InstanceImpl : public Instance {
     Node::Client thisNode;
     NodeAdmin::Client thisNodeAdmin;
     std::string nodeAddress;
+    bool isAdmin;
 
 public:
-    InstanceImpl(Node::Client thisNode, NodeAdmin::Client thisNodeAdmin, kj::Own<capnp::EzRpcClient> client, std::string nodeAddress):
-        client(std::move(client)), thisNode(thisNode), thisNodeAdmin(thisNodeAdmin), nodeAddress(nodeAddress) {
+    InstanceImpl(Node::Client thisNode, NodeAdmin::Client thisNodeAdmin, kj::Own<capnp::EzRpcClient> client, std::string nodeAddress, bool isAdmin):
+        client(std::move(client)), thisNode(thisNode), thisNodeAdmin(thisNodeAdmin), nodeAddress(nodeAddress), isAdmin(isAdmin) {
 
     }
 
     NodeAdmin::Client getThisNodeAdmin() override {
+        KJ_REQUIRE(isAdmin);
         return thisNodeAdmin;
     }
 
@@ -77,7 +79,7 @@ Rc<Instance> createInstance(std::string nodeAddress) {
 
     std::string canonicalNodeAddress = thisNode.addressRequest().send().wait(client->getWaitScope()).getAddress().getIp();
 
-    return std::make_shared<InstanceImpl>(thisNode, thisNodeAdmin, std::move(client), canonicalNodeAddress);
+    return std::make_shared<InstanceImpl>(thisNode, thisNodeAdmin, std::move(client), canonicalNodeAddress, isAdmin);
 }
 
 struct RcHolder : public Holder::Server {

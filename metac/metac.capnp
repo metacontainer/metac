@@ -60,3 +60,19 @@ interface Service {
    restore @0 (objectInfo :AnyPointer) -> (obj :AnyPointer);
    # Restores a SturdyRef associated with this service.
 }
+
+interface Persistent {
+   getSturdyRef @0 () -> (id :MetacSturdyRef);
+   # Get unguessable identifier for this capability.
+}
+
+interface Pinnable {
+   pin @0 ();
+   # Pin the object, persisting it even after all pointers are destroyed.
+}
+
+interface CastToLocal {
+   # Internal implementation interface.
+   # Until Level 4 is implemented in capnproto, we need a way to change capability into our local object.
+   registerLocal @0 (id :Text);
+}

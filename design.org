@@ -1,0 +1,74 @@
+* metac-cli
+
+MetaContainer CLI is a command line interface to the metac-adhoc service.
+It should make it easy to share all kinds of resources supported by MetaContainer. It should also be a superset of tools like LXD.
+
+** remote hosts
+
+#+BEGIN_EXAMPLE
+# on slave
+$ metac --to-cap --persistent
+created capability: fddf:978f:723::1/adhoc/goVqGgxsLhmbIRKX7DW
+# on host
+$ metac host add myslave fddf:978f:723::1/adhoc/goVqGgxsLhmbIRKX7DW
+$ metac host list --show-secrets
+name        cap
+-----------------------
+local       (local)
+myslave     fddf:978f:723::1/adhoc/goVqGgxsLhmbIRKX7DW
+# on slave
+$ metac cap list --show-secrets
+service        id                    info           bound to
+---------------------------------------------------------------------------
+adhoc          goVqGgxsLhmbIRKX7DW   full-access    fddf:978f:724::1/???
+#+END_EXAMPLE
+
+** ethernet tunnel
+
+#+BEGIN_EXAMPLE
+$ metac network create veth local:mytunnel --persistent
+$ metac network list local:
+id         name               dev1    dev2    persistent
+--------------------------------------------------------
+1          mytunnel0          net1    (none)  true
+2          mytunnel1          net2    (none)  true
+$ metac network bind local:mytunnel-left --to-dev local:tunnel0
+$ metac network to-cap local:mytunnel-right
+created capability:
+$ metac cap list --show-id
+service    id                   info      persistent    bound to
+--------------------------------------------------------------------
+network    rWCPje5bLOpObTU5jfb            true          *
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+# on the other host
+#+END_EXAMPLE
+
+** mounting remote filesystems
+
+#+BEGIN_EXAMPLE
+
+#+END_EXAMPLE
+
+** backplane configuration
+
+#+BEGIN_EXAMPLE
+$ metac backplane list local:
+address                 name
+-------------------------------
+fddf:978f:723::1/64     (host)
+fddf:978f:723::2        myvm
+fddf:978f:723:8000::1   (dynamic)
+fddf:978f:723:8000::2   (dynamic)
+$ metac backplane unpin local: fddf:978f:723::2
+#+END_EXAMPLE
+
+** starting VMs
+#+BEGIN_EXAMPLE
+
+#+END_EXAMPLE
+* metac-adhoc
+MetaContainer adhoc service is responsible for maintaining names of capabilities and persistence.
+
+It has a modular architecture with a module for each supported service (network, filesystem etc).
