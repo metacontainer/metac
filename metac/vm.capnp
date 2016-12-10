@@ -8,6 +8,8 @@ using Net = import "network.capnp";
 using Stream = import "stream.capnp";
 using Fs = import "fs.capnp";
 
+using BlockDevice = import "blockdevice.capnp".BlockDevice;
+
 struct LaunchConfiguration {
   struct KernelBoot {
     kernel @0 :Fs.File;
@@ -68,7 +70,7 @@ struct Drive {
     virtio @0;
   }
   driver @0 :Driver;
-  device @1 :Fs.BlockDevice;
+  device @1 :BlockDevice;
 }
 
 struct SerialPort {

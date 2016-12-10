@@ -4,3 +4,9 @@
 __pycache__/
 /build/
 compile_commands.json
+*_schema.nim
+nimenv.local
+nim.cfg
+/metac/vm
+nimcache/
+*.ndb

@@ -1,6 +1,6 @@
-@0xe669517eda764a9f;
+@0x8583e64cbe5a49fb;
 
-using Cxx = import "c++.capnp";
+using Cxx = import "/capnp/c++.capnp";
 $Cxx.namespace("metac::mcast");
 
 # Metac mcast is a partition tolerant highly-available metadata store.
