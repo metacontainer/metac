@@ -1,3 +1,9 @@
+
+*
+!*/
+!*.*
+!LICENSE
+
 *.capnp.c++
 *.capnp.h
 *.pyc
@@ -7,6 +13,5 @@ compile_commands.json
 *_schema.nim
 nimenv.local
 nim.cfg
-/metac/vm
 nimcache/
 *.ndb

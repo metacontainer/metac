@@ -1,5 +1,17 @@
 #!/bin/bash
-sudo rundev dev -- sh -c '
-rundev add bridge -- ./build/metac-bridge 10.234.0.1
-rundev add vm -- ./build/metac-vm 10.234.0.1
-'
+
+addr=fdca:ddf9:5703::1
+
+sudo mkdir -p /run/metac/$addr
+
+if [ ! -e /sys/class/net/metac1 ]; then
+    sudo ip link add metac1 type bridge
+    sudo ip addr add dev metac1 $addr
+    sudo ip link set dev metac1 up
+fi
+
+sudo rundev dev -- sh -c "
+rundev add bridge -- ./build/metac-bridge $addr
+sleep 0.5
+rundev add vm -- ./build/metac-vm $addr
+"

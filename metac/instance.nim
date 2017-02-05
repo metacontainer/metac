@@ -11,6 +11,7 @@ type
 proc newInstance*(address: string): Future[Instance] {.async.} =
   let self = Instance()
   self.isAdmin = getuid() == 0
+  self.address = address
 
   var conn: BytePipe
   if self.isAdmin:
@@ -28,3 +29,18 @@ proc newInstance*(address: string): Future[Instance] {.async.} =
     self.thisNode = (await self.rpcSystem.bootstrap()).castAs(Node)
 
   return self
+
+proc nodeAddress*(instance: Instance): NodeAddress =
+  return NodeAddress(ip: instance.address)
+
+type HolderImpl[T] = ref object of RootRef
+  obj: T
+
+proc toCapServer*(self: HolderImpl): CapServer =
+  return toGenericCapServer(self.asHolder)
+
+proc holder*[T](t: T): schemas.Holder =
+  when T is void:
+    return HolderImpl[T]().asHolder
+  else:
+    return HolderImpl[T](obj: t).asHolder

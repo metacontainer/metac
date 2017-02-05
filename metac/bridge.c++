@@ -144,6 +144,6 @@ int main(int argc, char** argv) {
     metac::unlink(sockPath);
 
     capnp::EzRpcServer serverUnix (kj::heap<metac::NodeAdminImpl>(bridge), "unix:" + sockPath);
-    capnp::EzRpcServer serverTcp (kj::heap<metac::NodeImpl>(bridge), nodeAddr + ":901");
+    capnp::EzRpcServer serverTcp (kj::heap<metac::NodeImpl>(bridge), "[" + nodeAddr + "]:901");
     kj::NEVER_DONE.wait(serverTcp.getWaitScope());
 }

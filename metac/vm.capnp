@@ -17,18 +17,22 @@ struct LaunchConfiguration {
     flags @2 :Text;
   }
 
-  boot :union {
-    kernel @0 :KernelBoot;
-    disk @1 :Int32;
+  struct Boot {
+    union {
+      kernel @0 :KernelBoot;
+      disk @1 :Int32;
+    }
   }
 
-  memory @2 :Int32;
+  boot @0 :Boot;
+
+  memory @1 :Int32;
   # Available memory, in MiB
 
-  vcpu @3 :Int32;
+  vcpu @2 :Int32;
   # CPU cores
 
-  machineInfo @8 :MachineInfo;
+  machineInfo @3 :MachineInfo;
   # CPU identification
 
   networks @4 :List(Network);

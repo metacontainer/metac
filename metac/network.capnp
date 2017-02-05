@@ -31,13 +31,9 @@ interface VxlanSetup {
 
   getRequestInfo @1 (request :AnyPointer) -> (remote :Metac.NodeAddress, iface :L2Interface, vni :Int32);
 
-  interface Connection {
-    # Hold this object to avoid having the connection torn down.
-  }
-
   struct Response {
     union {
-      ok @0 :Connection;
+      ok @0 :Holder;
       vniAlreadyUsed @1 :Void;
     }
   }
