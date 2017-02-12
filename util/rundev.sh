@@ -13,5 +13,4 @@ fi
 sudo rundev dev -- sh -c "
 rundev add bridge -- ./build/metac-bridge $addr
 sleep 0.5
-rundev add vm -- ./build/metac-vm $addr
 "

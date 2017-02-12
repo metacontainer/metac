@@ -22,11 +22,12 @@ const
 
 proc openat(dirfd: cint, pathname: cstring, flags: cint): cint {.importc, header: "<fcntl.h>".}
 
-proc openAtSync(path: string, finalFlags: cint=O_DIRECTORY): cint =
-  var fd: cint = retrySyscall(open("/", O_DIRECTORY or O_NOFOLLOW))
+proc openAtSync(path: string, finalFlags: cint): cint =
+  var parts = path[1..^1].split('/')
+
+  var fd: cint = retrySyscall(open("/", O_DIRECTORY or O_NOFOLLOW, 0o400))
   defer: discard close(fd)
 
-  var parts = path.split('/')
   for i in 0..<parts.len:
     var flags = if i == parts.len - 1: finalFlags else: O_DIRECTORY
     flags = flags or O_NOFOLLOW
@@ -39,4 +40,5 @@ proc openAtSync(path: string, finalFlags: cint=O_DIRECTORY): cint =
 
 proc openAt*(path: string, finalFlags: cint=O_DIRECTORY): Future[cint] =
   # Open file at `path` without following symlinks.
+  assert path != nil and path.len > 0 and path[0] == '/'
   return spawn(openAtSync(path, finalFlags))

@@ -8,6 +8,11 @@ type
     thisNodeAdmin*: NodeAdmin
     isAdmin*: bool
 
+let notAuthorized* = inlineCap(CapServer, CapServerInlineImpl(
+  call: (proc(ifaceId: uint64, methodId: uint64, args: AnyPointer): Future[AnyPointer] =
+             return now(error(AnyPointer, "not authorized to access admin interface (run as root)")))
+))
+
 proc newInstance*(address: string): Future[Instance] {.async.} =
   let self = Instance()
   self.isAdmin = getuid() == 0
@@ -25,7 +30,7 @@ proc newInstance*(address: string): Future[Instance] {.async.} =
     self.thisNodeAdmin = (await self.rpcSystem.bootstrap()).castAs(NodeAdmin)
     self.thisNode = await self.thisNodeAdmin.getUnprivilegedNode()
   else:
-    self.thisNodeAdmin = NodeAdmin.createFromCap(nothingImplemented)
+    self.thisNodeAdmin = NodeAdmin.createFromCap(notAuthorized)
     self.thisNode = (await self.rpcSystem.bootstrap()).castAs(Node)
 
   return self

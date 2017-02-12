@@ -33,7 +33,7 @@ interface VxlanSetup {
 
   struct Response {
     union {
-      ok @0 :Holder;
+      ok @0 :Void; # Holder
       vniAlreadyUsed @1 :Void;
     }
   }

@@ -1,7 +1,6 @@
 import reactor, caprpc, metac/instance, metac/schemas, collections
 
-proc unwrapStream*(instance: Instance, stream: schemas.Stream): Future[tuple[fd: cint, holder: Holder]] {.async.} =
-  ## Turns (possibly remote) Stream into file descriptor.
+template unwrapStreamBase(instance, stream, connFunc): untyped =
   let boundSocket = await bindSocketForConnect(parseAddress(instance.address), 0)
   let localAddr = boundSocket.getSockAddr()
 
@@ -12,17 +11,26 @@ proc unwrapStream*(instance: Instance, stream: schemas.Stream): Future[tuple[fd:
   echo info.pprint
   if info.local.ip == nil: raise newException(ValueError, "bad address")
 
-  let fd = await connectTcpAsFd(TcpConnectionData(
+  let fd = await connFunc(TcpConnectionData(
     host: parseAddress(info.local.ip),
     port: info.port,
     boundSocket: boundSocket))
 
-  return (fd, info.holder)
+  (fd, info.holder)
+
+proc unwrapStream*(instance: Instance, stream: schemas.Stream): Future[tuple[fd: cint, holder: Holder]] {.async.} =
+  ## Turns (possibly remote) Stream into file descriptor.
+  return unwrapStreamBase(instance, stream, connectTcpAsFd)
+
+proc unwrapStreamAsPipe*(instance: Instance, stream: schemas.Stream): Future[tuple[fd: BytePipe, holder: Holder]] {.async.} =
+  ## Turn (possibly remote) Stream into local BytePipe.
+  return unwrapStreamBase(instance, stream, connectTcp)
 
 proc wrapStream*(instance: Instance, stream: BytePipe): schemas.Stream =
   proc acceptConnections(remote: schemas.NodeAddress, port: int32, server: TcpServer): Future[void] {.async.} =
     asyncFor conn in server.incomingConnections:
       let address = conn.getPeerAddr
+      stderr.writeLine "stream: connection from ", address
       if address.address != parseAddress(remote.ip) or address.port != port:
         stderr.writeLine "stream: invalid host attempted connection (host: [$1]:$2, expected: [$3]:$4)" % [
           $address.address, $address.port, $parseAddress(remote.ip), $port]

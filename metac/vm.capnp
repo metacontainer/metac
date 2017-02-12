@@ -14,7 +14,7 @@ struct LaunchConfiguration {
   struct KernelBoot {
     kernel @0 :Fs.File;
     initrd @1 :Fs.File;
-    flags @2 :Text;
+    cmdline @2 :Text;
   }
 
   struct Boot {
