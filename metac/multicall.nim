@@ -11,3 +11,4 @@ if name == "vm-test":
   vm_test.main().runMain()
 else:
   stderr.writeLine("invalid command")
+  quit(1)

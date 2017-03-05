@@ -1,4 +1,4 @@
-import os, reactor, caprpc, metac/instance, metac/schemas, collections, posix, reactor/process
+import os, reactor, caprpc, metac/instance, metac/schemas, collections, posix, reactor/process, reactor/file
 import metac/stream, metac/fs
 
 type
@@ -68,6 +68,9 @@ proc launch(self: VMLauncherImpl, config: LaunchConfiguration): Future[VM] {.asy
     cmdline &= [
       "-kernel", kernelFile,
       "-append", bootOpt.cmdline]
+    if not bootOpt.initrd.toCapServer.isNullCap:
+      let initrdFile = await copyToTempFile(self.service.instance, bootOpt.initrd)
+      cmdline &= ["-initrd", initrdFile]
   else:
     asyncRaise("unsupported boot method")
 
@@ -83,6 +86,12 @@ proc launch(self: VMLauncherImpl, config: LaunchConfiguration): Future[VM] {.asy
   # networks
 
   # drives
+  for i, drive in config.drives:
+    let nbdStream = await drive.device.nbdSetup()
+    let nbdPath = await unwrapStreamToUnixSocket(self.service.instance, nbdStream)
+    cmdline &= [
+      "-drive", "format=raw,file=nbd:unix:" & nbdPath
+    ]
 
   # serialPorts
   for i, serialPort in config.serialPorts:
@@ -108,6 +117,7 @@ proc launch(self: VMLauncherImpl, config: LaunchConfiguration): Future[VM] {.asy
 
   var additionalFiles = @[(1.cint, 1.cint), (2.cint, 2.cint)]
   for fd in fds:
+    setBlocking(fd.FileFd)
     additionalFiles.add((fd, fd))
 
   vm.process = startProcess(cmdline, additionalFiles= additionalFiles)

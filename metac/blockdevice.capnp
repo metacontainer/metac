@@ -10,5 +10,5 @@ interface BlockDevice {
   # Represents a block device (e.g. a disk)
 
   # Low level interface
-  ndbSetup @0 () -> (stream :Stream);
+  nbdSetup @0 () -> (stream :Stream);
 }

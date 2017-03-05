@@ -1,4 +1,4 @@
-import reactor, caprpc, metac/instance, metac/schemas, collections
+import reactor, reactor/unix, caprpc, metac/instance, metac/schemas, collections, os, reactor/unix
 
 template unwrapStreamBase(instance, stream, connFunc): untyped =
   let boundSocket = await bindSocketForConnect(parseAddress(instance.address), 0)
@@ -26,7 +26,7 @@ proc unwrapStreamAsPipe*(instance: Instance, stream: schemas.Stream): Future[tup
   ## Turn (possibly remote) Stream into local BytePipe.
   return unwrapStreamBase(instance, stream, connectTcp)
 
-proc wrapStream*(instance: Instance, stream: BytePipe): schemas.Stream =
+proc wrapStream*(instance: Instance, getStream: (proc(): Future[BytePipe])): schemas.Stream =
   proc acceptConnections(remote: schemas.NodeAddress, port: int32, server: TcpServer): Future[void] {.async.} =
     asyncFor conn in server.incomingConnections:
       let address = conn.getPeerAddr
@@ -36,7 +36,8 @@ proc wrapStream*(instance: Instance, stream: BytePipe): schemas.Stream =
           $address.address, $address.port, $parseAddress(remote.ip), $port]
 
       server.incomingConnections.recvClose(JustClose)
-      pipe(conn.BytePipe, stream)
+      let streamPipe = await getStream()
+      await pipe(conn.BytePipe, streamPipe)
       return
 
   proc tcpListenImpl(remote: schemas.NodeAddress, port: int32): Future[Stream_tcpListen_Result] {.async.} =
@@ -53,3 +54,34 @@ proc wrapStream*(instance: Instance, stream: BytePipe): schemas.Stream =
   
   let cap = schemas.Stream.inlineCap(StreamInlineImpl(tcpListen: tcpListenImpl))
   return cap
+
+proc wrapStream*(instance: Instance, stream: BytePipe): schemas.Stream =
+  # TODO: if there is more than one connection, things break
+  return wrapStream(instance, () => now(just(stream)))
+
+proc wrapUnixSocketAsStream*(instance: Instance, path: string): schemas.Stream =
+  return wrapStream(instance, () => connectUnix(path).then(x => x.BytePipe))
+
+proc mkdtemp(tmpl: cstring): cstring {.importc, header: "stdlib.h".}
+
+proc unwrapStreamToUnixSocket*(instance: Instance, stream: schemas.Stream): Future[string] =
+  var dirPath = "/tmp/metac_unix_XXXXXX"
+  if mkdtemp(dirPath) == nil:
+    raiseOSError(osLastError())
+
+  let path = dirPath & "/socket"
+  let server = createUnixServer(path)
+
+  proc finish() =
+    removeFile(path)
+    removeDir(dirPath)
+
+  proc handler(): Future[void] {.async.} =
+    let conn = await server.incomingConnections.receive
+    let (unwrappedStream, holder) = await instance.unwrapStreamAsPipe(stream)
+    await pipe(conn.BytePipe, unwrappedStream)
+
+    finish() # TODO: defer
+
+  handler().ignore
+  return now(just(path))

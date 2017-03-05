@@ -28,8 +28,12 @@ proc main*() {.async.} =
     boot: LaunchConfiguration_Boot(kind: LaunchConfiguration_BootKind.kernel,
                                    kernel: LaunchConfiguration_KernelBoot(
                                      kernel: kernel,
-                                     initrd: kernel,
-                                     cmdline: "console=ttyS0"))
+                                     initrd: schemas.File.createFromCap(nullCap),
+                                     cmdline: "console=ttyS0 root=/dev/sda")),
+    #boot: LaunchConfiguration_Boot(kind: LaunchConfiguration_BootKind.disk),
+    drives: @[
+      Drive(device: instance.localBlockDevice(getCurrentDir() / "openwrt-15.05.1-x86-kvm_guest-rootfs-ext4.img"))
+    ]
   )
 
   echo config.pprint
