@@ -32,18 +32,20 @@ interface File {
   openAsBlock @1 () -> (device :BlockDevice);
 }
 
-# Low level API
-
 interface FilesystemServiceAdmin {
   rootNamespace @0 () -> (ns :FilesystemNamespace);
+}
+
+interface Mount {
+  # Persistable
+
 }
 
 interface FilesystemNamespace {
   filesystem @0 () -> (fs :Filesystem);
 
-  mount @1 (path :Text, fs :Filesystem);
+  mount @1 (path :Text, fs :Filesystem) -> (mount :Mount);
   # Mounts filesystem.
 
-  unmount @2 (path :Text) -> (ok :Bool);
-  # Unmounts filesystem.
+  listMounts @2 () -> (mounts :List(Mount));
 }

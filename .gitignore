@@ -15,3 +15,5 @@ nimenv.local
 nim.cfg
 nimcache/
 *.ndb
+
+/doc

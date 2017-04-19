@@ -33,6 +33,11 @@ interface ServiceAdmin {}
 
 interface Holder {}
 
+interface ResourceGroup {
+  # Resource group is used for accounting and rate limiting.
+
+}
+
 interface NodeAdmin {
   # Bootstrap interface for superusers. Exposes everything that is possible to do on this node.
 
@@ -59,16 +64,6 @@ interface Node {
 interface Service {
    restore @0 (objectInfo :AnyPointer) -> (obj :AnyPointer);
    # Restores a SturdyRef associated with this service.
-}
-
-interface Persistent {
-   getSturdyRef @0 () -> (id :MetacSturdyRef);
-   # Get unguessable identifier for this capability.
-}
-
-interface Pinnable {
-   pin @0 ();
-   # Pin the object, persisting it even after all pointers are destroyed.
 }
 
 interface CastToLocal {

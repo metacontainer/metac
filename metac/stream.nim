@@ -1,4 +1,4 @@
-import reactor, reactor/unix, caprpc, metac/instance, metac/schemas, collections, os, reactor/unix
+import reactor, reactor/unix, caprpc, metac/instance, metac/schemas, collections, os, reactor/unix, posix
 
 template unwrapStreamBase(instance, stream, connFunc): untyped =
   let boundSocket = await bindSocketForConnect(parseAddress(instance.address), 0)

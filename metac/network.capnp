@@ -4,18 +4,17 @@ using Cxx = import "/capnp/c++.capnp";
 $Cxx.namespace("metac::network");
 
 using Metac = import "metac.capnp";
+using Persistence = import "persistence.capnp";
 
 ### High level API
 
 interface NetworkService extends (Metac.Service) {
-   createL2Pair @0 () -> (a :L2Interface, b :L2Interface);
-   # Creates a new virtual ethernet cable.
-
    vxlanSetup @1 () -> (setup :VxlanSetup);
    # Low-level VXLAN setup
 }
 
 interface L2Interface {
+   bindTo @0 (other :L2Interface) -> (holder :Persistence.PersistableHolder);
 }
 
 ### Low level API for other services
@@ -45,8 +44,7 @@ interface KernelNetworkNamespace {
   listInterfaces @0 () -> (interfaces :List(KernelInterface));
   # Return a list of network interfaces existing in this namespace
 
-  addInterface @1 (iface :L2Interface, name :Text);
-  # Attachs L2Interface as a kernel interface in this namespace.
+  createInterface @1 (name :Text) -> :KernelInterface;
 }
 
 interface KernelInterface {
@@ -55,7 +53,9 @@ interface KernelInterface {
   getName @0 () -> (name :Text);
   # Name
 
-  attach @1 (iface :L2Interface);
+  destroy @1 ();
+
+
   # Attach (unattached) L2Interface to this kernel interface
 }
 
