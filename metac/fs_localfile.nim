@@ -25,15 +25,15 @@ proc nbdSetup(blockDev: LocalFileBlockDev): Future[schemas.Stream] {.async.} =
   setBlocking(fd.FileFd)
 
   let files = @[(1.cint, 1.cint), (2.cint, 2.cint), (3.cint, fd)]
-  let socketPath = "/run/metac/nbd_socket_" & hexUrandom(16)
+  let (dirPath, cleanup) = createUnixSocketDir()
+  # TODO: defer: cleanup()
+  let socketPath = dirPath & "/socket"
   startProcess(@["qemu-nbd",
                  "-f", "raw",
                  "/proc/self/fd/3", "--socket=" & socketPath],
                additionalFiles=files).detach
 
-  var buf: Stat
-  while stat(socketPath.cstring, buf) != 0:
-    await asyncSleep(10)
+  await waitForFile(socketPath)
 
   return wrapUnixSocketAsStream(self.instance, socketPath)
 
@@ -53,3 +53,7 @@ proc localBlockDevice*(instance: Instance, path: string): schemas.BlockDevice =
 proc localFile*(instance: Instance, path: string): schemas.File =
   ## Return File cap for local file on path ``path``.
   return LocalFile(instance: instance, path: path).asFile
+
+proc localFilePersistable(instance: ServiceInstance, path: string, runtimeId: string=nil): schemas.File =
+  return injectPersistence(instance, localFile(instance, path),
+                           category="fs:localfile", description=toAnyPointer(path), runtimeId=runtimeId)

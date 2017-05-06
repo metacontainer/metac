@@ -12,5 +12,10 @@ fi
 
 sudo rundev dev -- sh -c "
 rundev add bridge -- ./build/metac-bridge $addr
-sleep 0.5
+sleep 0.1
+rundev add persistence-service -- ./build/metac persistence-service
+sleep 1
+rundev add fs-service -- ./build/metac fs-service
+rundev add vm-service -- ./build/metac vm-service
+
 "

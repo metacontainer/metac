@@ -1,18 +1,16 @@
 ## Implements the multicall binary (all programs in one binary).
-import os, strutils, reactor
-import metac/vm, metac/fs
+import os, strutils, reactor, collections
+import metac/cli_common
+import metac/vm, metac/fs, metac/persistence_service
+import metac/fs_cli
 import tests/vm_test
 
-let name = paramStr(1)
+dispatchSubcommand({
+  "fs": (() => fs_cli.main()),
 
-case name:
-  of "vm":
-    vm.main().runMain()
-  of "fs":
-    fs.main().runMain()
-  # tests
-  of "vm-test":
-    vm_test.main().runMain()
-  else:
-    stderr.writeLine("invalid command")
-    quit(1)
+  "vm-service": (() => vm.main().runMain),
+  "fs-service": (() => fs.main().runMain),
+  "persistence-service": (() => persistence_service.main().runMain),
+
+  "vm-test": (() => vm_test.main().runMain()),
+})

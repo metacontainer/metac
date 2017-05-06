@@ -1,7 +1,7 @@
 # included from metac/fs.nim
 
 type LocalFilesystem = ref object of RootObj
-  instance: Instance
+  instance: ServiceInstance
   path: string
 
 proc getSubtree(fs: LocalFilesystem, path: string): Future[Filesystem]
@@ -16,7 +16,7 @@ proc getSubtree(fs: LocalFilesystem, path: string): Future[Filesystem] =
 
 proc getFile(fs: LocalFilesystem, path: string): Future[schemas.File] =
   return now(just(
-    LocalFile(instance: fs.instance, path: safeJoin(fs.path, path)).asFile))
+    localFilePersistable(fs.instance, safeJoin(fs.path, path))))
 
 async:
  proc v9fsStream(fs: LocalFilesystem): Future[Stream] =

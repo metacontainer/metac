@@ -1,4 +1,4 @@
-import metac/schemas, caprpc, posix, reactor, reactor/unix
+import metac/schemas, caprpc, posix, reactor, reactor/unix, os
 
 type
   Instance* = ref object
@@ -7,6 +7,11 @@ type
     thisNode*: Node
     thisNodeAdmin*: NodeAdmin
     isAdmin*: bool
+
+  ServiceInstance* = ref object
+    instance*: Instance
+    persistenceHandler*: ServicePersistenceHandler
+    serviceName: string
 
 let notAuthorized* = inlineCap(CapServer, CapServerInlineImpl(
   call: (proc(ifaceId: uint64, methodId: uint64, args: AnyPointer): Future[AnyPointer] =
@@ -35,8 +40,45 @@ proc newInstance*(address: string): Future[Instance] {.async.} =
 
   return self
 
+proc newInstance*(): Future[Instance] =
+  for entry in walkDir("/run/metac", relative=true):
+    return newInstance(entry.path)
+
+  raise newException(Exception, "no instance in /run/metac, please run metac-bridge")
+
 proc nodeAddress*(instance: Instance): NodeAddress =
   return NodeAddress(ip: instance.address)
+
+proc getServiceAdmin*[T](instance: Instance, name: string, typ: typedesc[T]): Future[T] {.async.} =
+  let service = await instance.thisNodeAdmin.getServiceAdmin(name)
+  return service.castAs(T)
+
+proc connect*(instance: Instance, address: NodeAddress): Future[Node] {.async.} =
+  # TODO: multiparty RpcSystem
+  let conn = await connectTcp(address.ip, 901)
+  let rpcSystem = newRpcSystem(newTwoPartyNetwork(conn, Side.client).asVatNetwork)
+  return rpcSystem.bootstrap().castAs(Node)
+
+### ServiceInstance
+
+proc newServiceInstance*(name: string): Future[ServiceInstance] {.async.} =
+  let instance = await newInstance()
+  let persistenceHandler = if name != "persistence":
+                             await instance.getServiceAdmin("persistence", PersistenceServiceAdmin).getHandlerFor(ServiceId(kind: ServiceIdKind.named, named: name))
+                           else:
+                             nullCap
+
+  return ServiceInstance(instance: instance, serviceName: name, persistenceHandler: persistenceHandler)
+
+proc runService*(sinstance: ServiceInstance, service: Service, adminBootstrap: ServiceAdmin) {.async.} =
+  ## Helper method for registering and running a service
+  let holder = await sinstance.instance.thisNodeAdmin.registerNamedService(sinstance.serviceName, service, adminBootstrap)
+  await waitForever()
+
+converter toInstance*(s: ServiceInstance): Instance =
+  return s.instance
+
+###
 
 type HolderImpl[T] = ref object of RootRef
   obj: T
@@ -49,3 +91,14 @@ proc holder*[T](t: T): schemas.Holder =
     return HolderImpl[T]().asHolder
   else:
     return HolderImpl[T](obj: t).asHolder
+
+### UTILS
+
+proc waitForFile*(path: string) {.async.} =
+  var buf: Stat
+  while stat(path.cstring, buf) != 0:
+    await asyncSleep(10)
+
+proc fakeUsage*(a: any) =
+  # forces GC to keep `a` to the point of this call
+  var v {.volatile.} = a

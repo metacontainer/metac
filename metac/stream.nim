@@ -35,6 +35,8 @@ proc wrapStream*(instance: Instance, getStream: (proc(): Future[BytePipe])): sch
         stderr.writeLine "stream: invalid host attempted connection (host: [$1]:$2, expected: [$3]:$4)" % [
           $address.address, $address.port, $parseAddress(remote.ip), $port]
 
+      defer:
+        stderr.writeLine "stream: connection finished (", address, ")"
       server.incomingConnections.recvClose(JustClose)
       let streamPipe = await getStream()
       await pipe(conn.BytePipe, streamPipe)
@@ -60,28 +62,37 @@ proc wrapStream*(instance: Instance, stream: BytePipe): schemas.Stream =
   return wrapStream(instance, () => now(just(stream)))
 
 proc wrapUnixSocketAsStream*(instance: Instance, path: string): schemas.Stream =
+  var buf: Stat
+  assert stat(path.cstring, buf) == 0, "socket doesn't exist"
+
   return wrapStream(instance, () => connectUnix(path).then(x => x.BytePipe))
 
 proc mkdtemp(tmpl: cstring): cstring {.importc, header: "stdlib.h".}
 
-proc unwrapStreamToUnixSocket*(instance: Instance, stream: schemas.Stream): Future[string] =
-  var dirPath = "/tmp/metac_unix_XXXXXX"
+proc createUnixSocketDir*(): tuple[path: string, cleanup: proc()] =
+  var dirPath = "/tmp/metac_unix_XXXXXXXX"
   if mkdtemp(dirPath) == nil:
     raiseOSError(osLastError())
 
+  proc finish() =
+    removeFile(dirPath & "/socket")
+    removeDir(dirPath)
+
+  return (dirPath, finish)
+
+proc unwrapStreamToUnixSocket*(instance: Instance, stream: schemas.Stream): Future[string] =
+  let (dirPath, cleanup) = createUnixSocketDir()
   let path = dirPath & "/socket"
   let server = createUnixServer(path)
 
-  proc finish() =
-    removeFile(path)
-    removeDir(dirPath)
-
   proc handler(): Future[void] {.async.} =
+    defer:
+      cleanup()
+      server.incomingConnections.recvClose JustClose
+
     let conn = await server.incomingConnections.receive
     let (unwrappedStream, holder) = await instance.unwrapStreamAsPipe(stream)
     await pipe(conn.BytePipe, unwrappedStream)
-
-    finish() # TODO: defer
 
   handler().ignore
   return now(just(path))

@@ -5,26 +5,29 @@ using Stream = import "stream.capnp".Stream;
 
 # For service users.
 
-interface PersistenceService extends (Service) {
+interface PersistenceService extends (Metac.Service) {
 
 }
 
 interface Persistable {
-   createSturdyRef @0 (rgroup :Metac.ResourceGroup) -> (id :MetacSturdyRef);
+   createSturdyRef @0 (rgroup :Metac.ResourceGroup, persistent :Bool) -> (id :Metac.MetacSturdyRef);
    # Create unguessable reference to this object and return it.
-
-   persist @1 (rgroup :Metac.ResourceGroup);
-   # Mark this object to be persistent between reboots.
 }
 
-interface PersistableHolder extends (Persistable, Holder) {
+interface PersistableHolder extends (Persistable, Metac.Holder) {
 
 }
 
 # For service authors.
 
+struct CapDescription {
+   runtimeId @0 :Text;
+   category @1 :Text;
+   description @2 :AnyPointer;
+}
+
 interface Restorer {
-   restoreFromDescription @0 (description :AnyPointer) -> :AnyPointer;
+   restoreFromDescription @0 (description :CapDescription) -> (cap :AnyPointer);
 }
 
 interface PersistenceServiceAdmin {
@@ -34,5 +37,9 @@ interface PersistenceServiceAdmin {
 interface ServicePersistenceHandler {
    registerRestorer @0 (restorer :Restorer);
 
-   saveCap @0 (group :PersistenceGroup, description :AnyPointer, cap :AnyPointer) -> :Metac.MetacSturdyRef;
+   createSturdyRef @1 (
+                   group :Metac.ResourceGroup,
+                   description :CapDescription,
+                   persistent :Bool,
+                   cap :AnyPointer) -> (ref :Metac.MetacSturdyRef);
 }

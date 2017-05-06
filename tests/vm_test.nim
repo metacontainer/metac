@@ -13,18 +13,15 @@ proc main*() {.async.} =
 
   let kernel = fs.localFile(instance, getCurrentDir() / "vmlinuz")
 
-  let config = LaunchConfiguration(
+  let badConfig = LaunchConfiguration(
     memory: 512,
     vcpu: 1,
     machineInfo: MachineInfo(`type`: MachineInfo_Type.host),
     serialPorts: @[
         SerialPort(
-            driver: SerialPort_Driver.default,
-            stream: instance.wrapStream(BytePipe(
-              input: newConstInput(""),
-              output: stdoutOutput("serial")))
-            )
-        ],
+          driver: SerialPort_Driver.default
+        )
+    ],
     boot: LaunchConfiguration_Boot(kind: LaunchConfiguration_BootKind.kernel,
                                    kernel: LaunchConfiguration_KernelBoot(
                                      kernel: kernel,
@@ -36,10 +33,35 @@ proc main*() {.async.} =
     ]
   )
 
+  let config = LaunchConfiguration(
+    memory: 512,
+    vcpu: 1,
+    machineInfo: MachineInfo(`type`: MachineInfo_Type.host),
+    serialPorts: @[
+        SerialPort(
+          driver: SerialPort_Driver.default,
+          name: "none"
+        )
+    ],
+    boot: LaunchConfiguration_Boot(kind: LaunchConfiguration_BootKind.kernel,
+                                   kernel: LaunchConfiguration_KernelBoot(
+                                     kernel: kernel,
+                                     initrd: schemas.File.createFromCap(nullCap),
+                                     cmdline: "console=ttyS0 root=/dev/sda")),
+    drives: @[]
+  )
+
   echo config.pprint
   let vm = await launcher.launch(config)
 
-  await asyncSleep(1000000)
+  let ports = await vm.serialPorts
+  echo "ports: ", ports.pprint
+  let (port, portHolder) = await instance.unwrapStreamAsPipe(ports[0])
+
+  asyncFor item in port.input.lines:
+     echo "[console] " & item.strip(leading=false)
+
+  echo portHolder.pprint
 
 when isMainModule:
   main().runMain

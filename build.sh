@@ -55,9 +55,9 @@ get_dep() {
 
 echo "path: \".\"" > nim.cfg
 
-get_dep capnp https://github.com/zielmicha/capnp.nim e73ecff309b1c80dcf657edd81b13566932110c6 ''
-get_dep collections https://github.com/zielmicha/collections.nim 17c4695ae2f75ed1c6634d8b8b8710f827675305 ''
-get_dep reactor https://github.com/zielmicha/reactor.nim 9b46da734709090c0ca65ee0417242ee0e2e1abf ''
+get_dep capnp https://github.com/zielmicha/capnp.nim 105da27725c354b6b9a0faaa99841a53f9e05eb9 ''
+get_dep collections https://github.com/zielmicha/collections.nim 31fc9aa5e55b6793350cbfb785223910559c57bb ''
+get_dep reactor https://github.com/zielmicha/reactor.nim 6d07546ebef65c3def260dc6b11a1729e12937fa ''
 
 echo '# reactor.nim requires pthreads
 threads: "on"
@@ -71,6 +71,10 @@ hint[ConvFromXtoItselfNotNeeded]: "off"
 hint[XDeclaredButNotUsed]: "off"
 
 debugger: "native"
+
+threadanalysis: "off"
+
+d:caprpcPrintExceptions
 
 @if release:
   gcc.options.always = "-w -fno-strict-overflow"

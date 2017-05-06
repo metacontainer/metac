@@ -1,7 +1,7 @@
 # included from metac/fs.nim
 
 proc main*() {.async.} =
-  let instance = await newInstance(paramStr(1))
+  let instance = await newServiceInstance("fs")
 
   let rootNamespace = LocalNamespace(instance: instance).asFilesystemNamespace
 
@@ -9,12 +9,18 @@ proc main*() {.async.} =
     rootNamespace: (() => now(just(rootNamespace)))
   ))
 
-  let holder = await instance.thisNodeAdmin.registerNamedService(
-    name="vm",
+  await instance.registerRestorer(
+    proc(d: CapDescription): Future[AnyPointer] =
+      case d.category:
+      of "fs:localfile":
+        return localFilePersistable(instance, d.description.castAs(string), runtimeId=d.runtimeId).toAnyPointer.just
+      else:
+        return error(AnyPointer, "unknown category"))
+
+  await instance.runService(
     service=Service.createFromCap(nothingImplemented),
     adminBootstrap=ServiceAdmin.createFromCap(serviceAdmin.toCapServer)
   )
-  await waitForever()
 
 when isMainModule:
   main().runMain

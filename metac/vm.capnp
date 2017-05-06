@@ -5,7 +5,7 @@ $Cxx.namespace("metac::vm");
 
 using Metac = import "metac.capnp";
 using Net = import "network.capnp";
-using Stream = import "stream.capnp";
+using Stream = import "stream.capnp".Stream;
 using Fs = import "fs.capnp";
 
 using BlockDevice = import "blockdevice.capnp".BlockDevice;
@@ -62,11 +62,11 @@ struct MachineInfo {
 }
 
 struct Network {
+  # Attaches a network device. L2Interface for this port will be later available in `networks` field of `VM`.
   enum Driver {
     virtio @0;
   }
   driver @0 :Driver;
-  network @1 :Net.L2Interface;
 }
 
 struct Drive {
@@ -78,17 +78,21 @@ struct Drive {
 }
 
 struct SerialPort {
+  # Attaches a serial port. The stream for this port will be later available in `serialPort` field of `VM`.
   enum Driver {
     default @0;
     virtio @1;
   }
   driver @0 :Driver;
-  stream @1 :Stream.Stream;
-  name @2 :Text;
+  name @1 :Text;
 }
 
-interface VM extends (Metac.Pinnable, Metac.Persistent) {
+interface VM {
   stop @0 ();
+
+  serialPorts @1 () -> (streams :List(Stream));
+
+  networks @2 () -> (interfaces :List(Net.L2Interface));
 }
 
 interface VMLauncher {

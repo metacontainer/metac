@@ -5,12 +5,13 @@ type
   VMServiceImpl = ref object of RootObj
     instance: Instance
 
-  VMLauncherImpl = ref object of RootObj
-    service: VMServiceImpl
-
   VMImpl = ref object of RootObj
     service: VMServiceImpl
     process: Process
+    cleanupProcs: seq[proc()]
+
+    serialPortsSeq: seq[Stream]
+    networkSeq: seq[L2Interface]
 
 proc getMachineType(info: MachineInfo): seq[string] =
   var s: string
@@ -35,11 +36,16 @@ proc qemuQuoteName(v: string): string =
 proc stop(self: VMImpl): Future[void] {.async.} =
   discard
 
-proc toCapServer(self: VMImpl): CapServer =
-  return toGenericCapServer(self.asVM)
+proc serialPorts(self: VMImpl): Future[seq[Stream]] =
+  return just(self.serialPortsSeq)
 
-proc launch(self: VMLauncherImpl, config: LaunchConfiguration): Future[VM] {.async.} =
-  let vm = VMImpl(service: self.service)
+proc networks(self: VMImpl): Future[seq[L2Interface]] =
+  return just(self.networkSeq)
+
+capServerImpl(VMImpl, [VM])
+
+proc launch(self: VMServiceImpl, config: LaunchConfiguration): Future[VM] {.async.} =
+  let vm = VMImpl(service: self, cleanupProcs: @[], serialPortsSeq: @[])
   var cmdline = @["qemu-system-x86_64",
                   "-enable-kvm",
                   "-nographic",
@@ -49,13 +55,11 @@ proc launch(self: VMLauncherImpl, config: LaunchConfiguration): Future[VM] {.asy
 
   echo "launch vm: ", config.pprint
   var fds: seq[cint] = @[]
-
   proc cleanupFds() =
     for fd in fds:
       discard close(fd)
 
-  # TODO: defer
-  # defer: cleanupFds(fds)
+  defer: cleanupFds()
 
   if config.boot.kind == LaunchConfiguration_BootKind.disk:
     if config.boot.disk != 0:
@@ -63,13 +67,13 @@ proc launch(self: VMLauncherImpl, config: LaunchConfiguration): Future[VM] {.asy
     cmdline &= ["-boot", "c"]
   elif config.boot.kind == LaunchConfiguration_BootKind.kernel and config.boot.kernel != nil:
     let bootOpt = config.boot.kernel
-    let kernelFile = await copyToTempFile(self.service.instance, bootOpt.kernel)
+    let kernelFile = await copyToTempFile(self.instance, bootOpt.kernel)
 
     cmdline &= [
       "-kernel", kernelFile,
       "-append", bootOpt.cmdline]
     if not bootOpt.initrd.toCapServer.isNullCap:
-      let initrdFile = await copyToTempFile(self.service.instance, bootOpt.initrd)
+      let initrdFile = await copyToTempFile(self.instance, bootOpt.initrd)
       cmdline &= ["-initrd", initrdFile]
   else:
     asyncRaise("unsupported boot method")
@@ -88,20 +92,22 @@ proc launch(self: VMLauncherImpl, config: LaunchConfiguration): Future[VM] {.asy
   # drives
   for i, drive in config.drives:
     let nbdStream = await drive.device.nbdSetup()
-    let nbdPath = await unwrapStreamToUnixSocket(self.service.instance, nbdStream)
+    let nbdPath = await unwrapStreamToUnixSocket(self.instance, nbdStream)
     cmdline &= [
       "-drive", "format=raw,file=nbd:unix:" & nbdPath
     ]
 
+  var serialPortPaths: seq[string] = @[]
+
   # serialPorts
   for i, serialPort in config.serialPorts:
-    let (sockFd, holder) = await unwrapStream(self.service.instance,
-                                              serialPort.stream)
-    fds.add sockFd
+    let (dirPath, cleanup) = createUnixSocketDir()
+    let path = dirPath & "/socket"
     cmdline &= [
-      "-add-fd", "fd=$1,set=$2" % [$sockFd, $sockFd],
-      "-chardev", "serial,id=metacserial$1,path=/dev/fdset/$2" % [$i, $sockFd]
+      "-chardev", "socket,id=metacserial$1,path=$2,server" % [$i, $path]
     ]
+    vm.cleanupProcs.add cleanup
+    serialPortPaths.add path
 
     if serialPort.driver == SerialPort_Driver.virtio:
       cmdline &= [
@@ -122,6 +128,10 @@ proc launch(self: VMLauncherImpl, config: LaunchConfiguration): Future[VM] {.asy
 
   vm.process = startProcess(cmdline, additionalFiles= additionalFiles)
 
+  for path in serialPortPaths:
+    await waitForFile(path)
+    vm.serialPortsSeq.add self.instance.wrapUnixSocketAsStream(path)
+
   return vm.asVM
 
 proc getPinnedVMs(self: VMServiceImpl): Future[seq[VM]] {.async.} =
@@ -130,26 +140,22 @@ proc getPinnedVMs(self: VMServiceImpl): Future[seq[VM]] {.async.} =
 proc getPciDevices(self: VMServiceImpl): Future[seq[PciDevice]] {.async.} =
   return nil
 
-proc toCapServer(self: VMLauncherImpl): CapServer =
-  return toGenericCapServer(self.asVMLauncher)
+proc getLauncher(self: VMServiceImpl): Future[VMLauncher] {.async.}
+
+capServerImpl(VMServiceImpl, [VMLauncher, VMServiceAdmin])
 
 proc getLauncher(self: VMServiceImpl): Future[VMLauncher] {.async.} =
-  return VMLauncherImpl(service: self).asVMLauncher
-
-proc toCapServer(self: VMServiceImpl): CapServer =
-  return toGenericCapServer(self.asVMServiceAdmin)
+  return self.restrictInterfaces(VMLauncher)
 
 proc main*() {.async.} =
-  let instance = await newInstance(paramStr(1))
+  let instance = await newServiceInstance("vm")
 
   let serviceAdmin = VMServiceImpl(instance: instance).asVMServiceAdmin
 
-  let holder = await instance.thisNodeAdmin.registerNamedService(
-    name="vm",
+  await instance.runService(
     service=Service.createFromCap(nothingImplemented),
-    adminBootstrap=ServiceAdmin.createFromCap(serviceAdmin.toCapServer)
+    adminBootstrap=serviceAdmin.castAs(ServiceAdmin)
   )
-  await waitForever()
 
 when isMainModule:
   main().runMain()

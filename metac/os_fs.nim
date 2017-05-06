@@ -7,10 +7,10 @@ proc safeJoin*(base: string, child: string): string =
   if child.split('/').len + base.split('/').len > 40:
     raise newException(ValueError, "path too long")
 
-  var base = base
+  var base = base.strip(leading=false, chars={'/'})
 
-  for item in child.split('/'):
-    if item == ".." or item == "." or item == "-":
+  for item in child.strip(chars={'/'}).split('/'):
+    if item == ".." or item == "." or item == "":
       raise newException(ValueError, "invalid path component " & item)
     base &= "/" & item
 
@@ -24,11 +24,12 @@ proc openat(dirfd: cint, pathname: cstring, flags: cint): cint {.importc, header
 
 proc openAtSync(path: string, finalFlags: cint): cint =
   var parts = path[1..^1].split('/')
-
   var fd: cint = retrySyscall(open("/", O_DIRECTORY or O_NOFOLLOW, 0o400))
   defer: discard close(fd)
 
   for i in 0..<parts.len:
+    if parts[i] == "." or parts[i] == ".." or parts[i] == "":
+      raise newException(ValueError, "invalid path component " & parts[i])
     var flags = if i == parts.len - 1: finalFlags else: O_DIRECTORY
     flags = flags or O_NOFOLLOW
     let newFd = retrySyscall(openat(fd, parts[i], flags))

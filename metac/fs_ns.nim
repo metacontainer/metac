@@ -2,7 +2,7 @@
 
 type
   LocalNamespace = ref object of RootObj
-    instance: Instance
+    instance: ServiceInstance
 
   LocalMount = ref object of RootObj
 

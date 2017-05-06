@@ -19,7 +19,7 @@ interface HardwareSink extends (Sink) {
     id @0 () -> (id :Text);
 }
 
-interface HardwareSource extends (Sources) {
+interface HardwareSource extends (Source) {
     id @0 () -> (id :Text);
 }
 
