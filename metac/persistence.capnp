@@ -43,3 +43,19 @@ interface ServicePersistenceHandler {
                    persistent :Bool,
                    cap :AnyPointer) -> (ref :Metac.MetacSturdyRef);
 }
+
+struct PersistentPayload {
+    content @0 :AnyPointer;
+
+    capTable @1 :List(Metac.MetacSturdyRef);
+}
+
+struct Call {
+   cap @0 :AnyPointer;
+
+   interfaceId @1 :UInt64;
+
+   methodId @2 :UInt64;
+
+   args @3 :AnyPointer;
+}

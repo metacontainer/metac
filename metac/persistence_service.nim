@@ -1,4 +1,4 @@
-import tables, reactor, capnp, caprpc, strutils, metac/schemas, metac/instance, collections, db_sqlite
+import tables, reactor, capnp, caprpc, strutils, metac/schemas, metac/instance, collections, db_sqlite, metac/persistence
 
 type
   PersistenceServiceImpl = ref object of RootObj
@@ -7,7 +7,9 @@ type
     dbConn: DbConn
 
   StoredCap = ref object
-    description: CapDescription
+    runtimeId: string
+    category: string
+    description: Future[AnyPointer]
     persistent: bool
 
     cap: Future[CapServer]
@@ -22,6 +24,21 @@ type
     capByRuntimeId: TableRef[string, StoredCap]
     capBySturdyRef: TableRef[string, StoredCap]
 
+proc restoreInternal(storedCap: StoredCap): Future[CapServer] {.async.} =
+  if storedCap.category == "persistence:call":
+    let callDescr = storedCap.description.get.castAs(Call)
+    let retStruct = await callDescr.cap.castAs(CapServer).call(callDescr.interfaceId, callDescr.methodId, callDescr.args)
+    return retStruct.getPointerField(0).castAs(CapServer)
+  else:
+    raise newException(ValueError, "bad category")
+
+proc restoreUsingRestorer(storedCap: StoredCap, restorer: Restorer): Future[CapServer] {.async.} =
+  let description = await storedCap.description
+  if storedCap.category.startsWith("persistence:"):
+    return restoreInternal(storedCap)
+  else:
+    return restorer.restoreFromDescription(CapDescription(category: storedCap.category, runtimeId: storedCap.runtimeId, description: description)).castAs(CapServer)
+
 proc registerRestorer(self: ServicePersistenceHandlerImpl, restorer: Restorer): Future[void] =
   # begin restoration of all caps
   echo "registerRestorer for ", self.name
@@ -32,28 +49,31 @@ proc registerRestorer(self: ServicePersistenceHandlerImpl, restorer: Restorer): 
       storedCap.cap = storedCap.capCompleter.getFuture
 
     storedCap.isRestoreStarted = true
-    storedCap.capCompleter.completeFrom(restorer.restoreFromDescription(storedCap.description).castAs(CapServer))
+    storedCap.capCompleter.completeFrom(restoreUsingRestorer(storedCap, restorer))
 
   return now(just())
 
-proc persist(self: ServicePersistenceHandlerImpl, storedCap: StoredCap) =
-  let serializedDescription = packPointer(storedCap.description.description)
+proc persist(self: ServicePersistenceHandlerImpl, storedCap: StoredCap, rgroup: ResourceGroup): Future[void] {.async.} =
+  assert storedCap.description.isCompleted
+  let serializedDescription = await packWithCaps(storedCap.description.get, rgroup)
   self.service.dbConn.exec(sql"insert into caps values (?, ?, ?, ?)",
-                           self.name, storedCap.description.runtimeId, storedCap.description.category, encodeHex(serializedDescription))
+                           self.name, storedCap.runtimeId, storedCap.category, encodeHex(serializedDescription))
   storedCap.persistent = true
 
 proc addPersistentRef(self: ServicePersistenceHandlerImpl, storedCap: StoredCap, sturdyRef: string) =
   self.service.dbConn.exec(sql"insert into refs values (?, ?, ?)",
-                           self.name, encodeHex(sturdyRef), storedCap.description.runtimeId)
+                           self.name, encodeHex(sturdyRef), storedCap.runtimeId)
 
-proc createSturdyRef(self: ServicePersistenceHandlerImpl; group: ResourceGroup;
+proc createSturdyRef(self: ServicePersistenceHandlerImpl; rgroup: ResourceGroup;
                      description: CapDescription; persistent: bool; cap: AnyPointer): Future[MetacSturdyRef] {.async.} =
   let cap = cap.castAs(CapServer)
   let sturdyRefId = urandom(32)
   let sturdyRef = self.name & "\0" & sturdyRefId
 
   if description.runtimeId notin self.capByRuntimeId:
-    self.capByRuntimeId[description.runtimeId] = StoredCap(description: description,
+    self.capByRuntimeId[description.runtimeId] = StoredCap(description: just(description.description),
+                                                           runtimeId: description.runtimeId,
+                                                           category: description.category,
                                                            capCompleter: nil,
                                                            cap: just(cap))
 
@@ -61,8 +81,11 @@ proc createSturdyRef(self: ServicePersistenceHandlerImpl; group: ResourceGroup;
   self.capBySturdyRef[sturdyRefId] = storedCap
 
   if persistent:
+    if description.category == nil:
+      asyncRaise("cannot create persistent sturdy ref to this object")
+
     if not storedCap.persistent:
-      self.persist(storedCap)
+      await self.persist(storedCap, rgroup)
 
     self.addPersistentRef(storedCap, sturdyRefId)
 
@@ -93,7 +116,10 @@ proc restore(self: PersistenceServiceImpl, objectInfo: AnyPointer): Future[AnyPo
   let serviceName = objectId[0]
   let sturdyRef = objectId[1]
 
-  let storedCap = self.handlers[serviceName].capBySturdyRef[sturdyRef]
+  let storedCap = self.handlers[serviceName].capBySturdyRef.getOrDefault(sturdyRef)
+  if storedCap == nil:
+    return error(AnyPointer, "invalid sturdy ref")
+
   let cap = await storedCap.cap
   return just(cap.toAnyPointer)
 
@@ -115,11 +141,13 @@ proc initService(instance: ServiceInstance): PersistenceServiceImpl =
     let category = row[2]
     let serializedDescription = decodeHex(row[3])
 
-    let description = newUnpackerFlat(serializedDescription).unpackPointer(0, AnyPointer)
-    let capDescription = CapDescription(description: description, runtimeId: runtimeId, category: category)
+    let descriptionFut = unpackWithCaps(instance, serializedDescription, AnyPointer)
     let capCompleter = newCompleter[CapServer]()
-    self.getHandlerImpl(service).capByRuntimeId[runtimeId] = StoredCap(description: capDescription,
-                                                                       persistent: true, cap: capCompleter.getFuture,
+    self.getHandlerImpl(service).capByRuntimeId[runtimeId] = StoredCap(description: descriptionFut,
+                                                                       runtimeId: runtimeId,
+                                                                       category: category,
+                                                                       persistent: true,
+                                                                       cap: capCompleter.getFuture,
                                                                        capCompleter: capCompleter)
 
   for row in self.dbConn.getAllRows(sql"select service, sturdyRef, runtimeId  from refs"):

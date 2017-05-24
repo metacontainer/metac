@@ -62,37 +62,58 @@ struct MachineInfo {
 }
 
 struct Network {
-  # Attaches a network device. L2Interface for this port will be later available in `networks` field of `VM`.
+  # Attaches a network device.
+
   enum Driver {
     virtio @0;
+    e1000 @1;
   }
   driver @0 :Driver;
+  # Driver for the network card.
+
+  network @1 :Net.L2Interface;
+  # The network.
+  # If null, new network will be created, later available via 'VM.network' method.
 }
 
 struct Drive {
   enum Driver {
     virtio @0;
+    ide @1;
   }
   driver @0 :Driver;
+  # Driver for the drive.
+
   device @1 :BlockDevice;
+  # The block device for this drive.
 }
 
 struct SerialPort {
-  # Attaches a serial port. The stream for this port will be later available in `serialPort` field of `VM`.
+  # Attaches a serial port.
   enum Driver {
     default @0;
     virtio @1;
   }
   driver @0 :Driver;
+  # Serial port driver
+
   name @1 :Text;
+  # Name of the port (only useful for virtio driver)
+
+  nowait @2 :Bool;
+  # Do not wait for connection to this port. May discard initial output.
+
+  stream @3 :Stream;
+  # The stream connected to this serial port.
+  # If null, new stream will be created, later available via 'VM.serialPort' method.
 }
 
 interface VM {
-  stop @0 ();
+  destroy @0 ();
 
-  serialPorts @1 () -> (streams :List(Stream));
+  serialPort @1 (index :Int32) -> (stream :Stream);
 
-  networks @2 () -> (interfaces :List(Net.L2Interface));
+  network @2 (index :Int32) -> (l2interface :Net.L2Interface);
 }
 
 interface VMLauncher {

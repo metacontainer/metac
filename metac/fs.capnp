@@ -38,7 +38,6 @@ interface FilesystemServiceAdmin {
 
 interface Mount {
   # Persistable
-
 }
 
 interface FilesystemNamespace {

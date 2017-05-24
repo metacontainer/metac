@@ -1,12 +1,9 @@
 # included from metac/fs.nim
 
 type
-  LocalFile = ref object of RootObj
+  LocalFile = ref object of PersistableObj
     instance: Instance
     path: string
-
-  LocalFileBlockDev = ref object of RootObj
-    localFile: LocalFile
 
 # LocalFile
 
@@ -19,8 +16,7 @@ proc openAsStream(self: LocalFile): Future[schemas.Stream] {.async.} =
   return self.instance.wrapStream(BytePipe(input: input,
                                            output: nullOutput(byte)))
 
-proc nbdSetup(blockDev: LocalFileBlockDev): Future[schemas.Stream] {.async.} =
-  let self = blockDev.localFile
+proc nbdSetup(self: LocalFile): Future[schemas.Stream] {.async.} =
   let fd = (await self.open)
   setBlocking(fd.FileFd)
 
@@ -37,23 +33,19 @@ proc nbdSetup(blockDev: LocalFileBlockDev): Future[schemas.Stream] {.async.} =
 
   return wrapUnixSocketAsStream(self.instance, socketPath)
 
-capServerImpl(LocalFileBlockDev, BlockDevice)
+proc openAsBlock(self: LocalFile): Future[schemas.BlockDevice] {.async.}
+
+capServerImpl(LocalFile, [schemas.File, BlockDevice, Persistable])
 
 proc openAsBlock(self: LocalFile): Future[schemas.BlockDevice] {.async.} =
-  return LocalFileBlockDev(localFile: self).asBlockDevice
-
-capServerImpl(LocalFile, schemas.File)
+  return self.asBlockDevice
 
 # LocalFileBlockDev
 
-proc localBlockDevice*(instance: Instance, path: string): schemas.BlockDevice =
-  ## Return BlockDevice cap for local file on path ``path``.
-  return LocalFileBlockDev(localFile: LocalFile(instance: instance, path: path)).asBlockDevice
-
-proc localFile*(instance: Instance, path: string): schemas.File =
+proc localFile*(instance: Instance, path: string, persistenceDelegate: PersistenceDelegate=nil): schemas.File =
   ## Return File cap for local file on path ``path``.
-  return LocalFile(instance: instance, path: path).asFile
+  return LocalFile(instance: instance, path: path, persistenceDelegate: persistenceDelegate).asFile
 
 proc localFilePersistable(instance: ServiceInstance, path: string, runtimeId: string=nil): schemas.File =
-  return injectPersistence(instance, localFile(instance, path),
-                           category="fs:localfile", description=toAnyPointer(path), runtimeId=runtimeId)
+  return localFile(instance, path, instance.makePersistenceDelegate(
+    category="fs:localfile", description=toAnyPointer(path), runtimeId=runtimeId))

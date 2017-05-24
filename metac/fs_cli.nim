@@ -1,6 +1,6 @@
-import reactor, capnp, metac/instance, metac/schemas, metac/stream, metac/persistence, metac/cli_common, strutils, collections
+import reactor, capnp, metac/instance, metac/schemas, metac/stream, metac/persistence, metac/cli_common, strutils, collections, cligen
 
-proc fileFromUri[T: schemas.File|Filesystem](instance: Instance, uri: string, typ: typedesc[T]): Future[T] {.async.} =
+proc fileFromUri*[T: schemas.File|Filesystem](instance: Instance, uri: string, typ: typedesc[T]): Future[T] {.async.} =
   let s = uri.split(":", 1)
   let schema = s[0]
   let path = s[1]
@@ -20,24 +20,34 @@ proc fileFromUri[T: schemas.File|Filesystem](instance: Instance, uri: string, ty
   else:
     return root.getSubtree(path)
 
-proc exportCmd() {.async.} =
-  let instance = await newInstance()
-  let uri = argv[0]
-  let file = await instance.fileFromUri(uri, schemas.File)
-  let sref = await file.castAs(schemas.Persistable).createSturdyRef(nullCap, true)
-  echo sref.formatSturdyRef
+proc exportCmd(uri: string, persistent=false) =
+  if uri == nil:
+    quit("missing required parameter")
 
-proc catCmd() {.async.} =
-  let instance = await newInstance()
-  let uri = argv[0]
-  let file = await instance.fileFromUri(uri, schemas.File)
-  let stream = await file.openAsStream()
-  let (fd, holder) = await instance.unwrapStreamAsPipe(stream)
-  let data = await fd.input.readUntilEof()
-  echo data
+  asyncMain:
+    let instance = await newInstance()
+    let file = await instance.fileFromUri(uri, schemas.File)
+    let sref = await file.castAs(schemas.Persistable).createSturdyRef(nullCap, persistent)
+    echo sref.formatSturdyRef
+
+dispatchGen(exportCmd)
+
+proc catCmd(uri: string) =
+  if uri == nil:
+    quit("missing required parameter")
+
+  asyncMain:
+    let instance = await newInstance()
+    let file = await instance.fileFromUri(uri, schemas.File)
+    let stream = await file.openAsStream()
+    let (fd, holder) = await instance.unwrapStreamAsPipe(stream)
+    let data = await fd.input.readUntilEof()
+    echo data
+
+dispatchGen(catCmd)
 
 proc main*() =
   dispatchSubcommand({
-    "export": () => exportCmd().runMain,
-    "cat": () => catCmd().runMain
+    "export": () => quit(dispatchExportCmd(argv, doc="")),
+    "cat": () => quit(dispatchCatCmd(argv, doc=""))
   })

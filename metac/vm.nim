@@ -1,17 +1,17 @@
 import os, reactor, caprpc, metac/instance, metac/schemas, collections, posix, reactor/process, reactor/file
-import metac/stream, metac/fs
+import metac/stream, metac/fs, metac/persistence
 
 type
   VMServiceImpl = ref object of RootObj
-    instance: Instance
+    instance: ServiceInstance
 
-  VMImpl = ref object of RootObj
-    service: VMServiceImpl
-    process: Process
+  VMImpl = ref object of PersistableObj
+    instance: ServiceInstance
+    process: process.Process
     cleanupProcs: seq[proc()]
 
-    serialPortsSeq: seq[Stream]
-    networkSeq: seq[L2Interface]
+    serialPorts: seq[Stream]
+    networks: seq[L2Interface]
 
 proc getMachineType(info: MachineInfo): seq[string] =
   var s: string
@@ -36,16 +36,23 @@ proc qemuQuoteName(v: string): string =
 proc stop(self: VMImpl): Future[void] {.async.} =
   discard
 
-proc serialPorts(self: VMImpl): Future[seq[Stream]] =
-  return just(self.serialPortsSeq)
+proc serialPort(self: VMImpl, index: int32): Future[Stream] =
+  if index < 0 or index >= self.serialPorts.len:
+    return error(Stream, "VM.serialPort: bad index")
+  return just(self.serialPorts[index.int])
 
-proc networks(self: VMImpl): Future[seq[L2Interface]] =
-  return just(self.networkSeq)
+proc network(self: VMImpl, index: int32): Future[L2Interface] =
+  if index < 0 or index >= self.networks.len:
+    return error(L2Interface, "VM.network: bad index")
+  return just(self.networks[index.int])
 
-capServerImpl(VMImpl, [VM])
+proc destroy(self: VMImpl): Future[void] {.async.} =
+  return
 
-proc launch(self: VMServiceImpl, config: LaunchConfiguration): Future[VM] {.async.} =
-  let vm = VMImpl(service: self, cleanupProcs: @[], serialPortsSeq: @[])
+capServerImpl(VMImpl, [VM, Persistable])
+
+proc launchVM(instance: ServiceInstance, config: LaunchConfiguration, persistenceDelegate: PersistenceDelegate=nil): Future[VM] {.async.} =
+  let vm = VMImpl(instance: instance, cleanupProcs: @[], serialPorts: @[], networks: @[], persistenceDelegate: persistenceDelegate)
   var cmdline = @["qemu-system-x86_64",
                   "-enable-kvm",
                   "-nographic",
@@ -67,13 +74,13 @@ proc launch(self: VMServiceImpl, config: LaunchConfiguration): Future[VM] {.asyn
     cmdline &= ["-boot", "c"]
   elif config.boot.kind == LaunchConfiguration_BootKind.kernel and config.boot.kernel != nil:
     let bootOpt = config.boot.kernel
-    let kernelFile = await copyToTempFile(self.instance, bootOpt.kernel)
+    let kernelFile = await copyToTempFile(instance, bootOpt.kernel)
 
     cmdline &= [
       "-kernel", kernelFile,
       "-append", bootOpt.cmdline]
     if not bootOpt.initrd.toCapServer.isNullCap:
-      let initrdFile = await copyToTempFile(self.instance, bootOpt.initrd)
+      let initrdFile = await copyToTempFile(instance, bootOpt.initrd)
       cmdline &= ["-initrd", initrdFile]
   else:
     asyncRaise("unsupported boot method")
@@ -92,7 +99,7 @@ proc launch(self: VMServiceImpl, config: LaunchConfiguration): Future[VM] {.asyn
   # drives
   for i, drive in config.drives:
     let nbdStream = await drive.device.nbdSetup()
-    let nbdPath = await unwrapStreamToUnixSocket(self.instance, nbdStream)
+    let nbdPath = await unwrapStreamToUnixSocket(instance, nbdStream)
     cmdline &= [
       "-drive", "format=raw,file=nbd:unix:" & nbdPath
     ]
@@ -104,7 +111,7 @@ proc launch(self: VMServiceImpl, config: LaunchConfiguration): Future[VM] {.asyn
     let (dirPath, cleanup) = createUnixSocketDir()
     let path = dirPath & "/socket"
     cmdline &= [
-      "-chardev", "socket,id=metacserial$1,path=$2,server" % [$i, $path]
+      "-chardev", "socket,id=metacserial$1,path=$2,server$3" % [$i, $path, if serialPort.nowait: ",nowait" else: ""]
     ]
     vm.cleanupProcs.add cleanup
     serialPortPaths.add path
@@ -128,11 +135,16 @@ proc launch(self: VMServiceImpl, config: LaunchConfiguration): Future[VM] {.asyn
 
   vm.process = startProcess(cmdline, additionalFiles= additionalFiles)
 
-  for path in serialPortPaths:
+  for i, path in serialPortPaths:
     await waitForFile(path)
-    vm.serialPortsSeq.add self.instance.wrapUnixSocketAsStream(path)
+    let sock = instance.wrapUnixSocketAsStream(path)
+    vm.serialPorts.add injectPersistence(sock, makePersistenceCallDelegate(instance, vm.asVM, VM_serialPort_Params(index: i.int32)))
 
   return vm.asVM
+
+proc launch(self: VMServiceImpl, config: LaunchConfiguration, runtimeId: string=nil): Future[VM] {.async.} =
+  return launchVM(self.instance, config,
+                  self.instance.makePersistenceDelegate("vm:vm", description=config.toAnyPointer, runtimeId=runtimeId))
 
 proc getPinnedVMs(self: VMServiceImpl): Future[seq[VM]] {.async.} =
   return nil
@@ -150,7 +162,17 @@ proc getLauncher(self: VMServiceImpl): Future[VMLauncher] {.async.} =
 proc main*() {.async.} =
   let instance = await newServiceInstance("vm")
 
-  let serviceAdmin = VMServiceImpl(instance: instance).asVMServiceAdmin
+  let serviceImpl = VMServiceImpl(instance: instance)
+  let serviceAdmin = serviceImpl.asVMServiceAdmin
+
+  await instance.registerRestorer(
+    proc(d: CapDescription): Future[AnyPointer] =
+      case d.category:
+      of "vm:vm":
+        return launch(serviceImpl, d.description.castAs(LaunchConfiguration), runtimeId=d.runtimeId).toAnyPointerFuture
+      else:
+        return error(AnyPointer, "unknown category"))
+
 
   await instance.runService(
     service=Service.createFromCap(nothingImplemented),
