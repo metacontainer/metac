@@ -17,5 +17,6 @@ rundev add persistence-service -- ./build/metac persistence-service
 sleep 1
 rundev add fs-service -- ./build/metac fs-service
 rundev add vm-service -- ./build/metac vm-service
-
+sleep 1
+rundev add computevm-service -- ./build/metac computevm-service
 "

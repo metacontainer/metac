@@ -1,0 +1,3 @@
+
+when isMainModule:
+  discard

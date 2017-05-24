@@ -1,4 +1,5 @@
-import metac, metac/schemas, metac/vm, metac/fs, metac/stream, collections, os
+import metac, metac/schemas, metac/vm, metac/fs, metac/stream, metac/persistence, collections, os
+import metac/fs_cli
 
 proc stdoutOutput(tag: string): ByteOutput =
   proc fun(input: ByteInput) {.async.} =
@@ -11,9 +12,11 @@ proc main*() {.async.} =
   let serv = instance.thisNodeAdmin.getServiceAdmin("vm").await.toAnyPointer.castAs(VMServiceAdmin)
   let launcher = await serv.getLauncher
 
-  let kernel = fs.localFile(instance, getCurrentDir() / "vmlinuz")
+  let kernel = await fs_cli.fileFromUri(instance, "local:" & (getCurrentDir() / "vmlinuz"), schemas.File)
+  let drive = await fs_cli.fileFromUri(instance, "local:" & (getCurrentDir() / "openwrt-15.05.1-x86-kvm_guest-rootfs-ext4.img"), schemas.File)
+  let driveBlockDev = await drive.openAsBlock
 
-  let badConfig = LaunchConfiguration(
+  let config = LaunchConfiguration(
     memory: 512,
     vcpu: 1,
     machineInfo: MachineInfo(`type`: MachineInfo_Type.host),
@@ -25,43 +28,20 @@ proc main*() {.async.} =
     boot: LaunchConfiguration_Boot(kind: LaunchConfiguration_BootKind.kernel,
                                    kernel: LaunchConfiguration_KernelBoot(
                                      kernel: kernel,
-                                     initrd: schemas.File.createFromCap(nullCap),
+                                     initrd: nullCap,
                                      cmdline: "console=ttyS0 root=/dev/sda")),
     #boot: LaunchConfiguration_Boot(kind: LaunchConfiguration_BootKind.disk),
     drives: @[
-      Drive(device: instance.localBlockDevice(getCurrentDir() / "openwrt-15.05.1-x86-kvm_guest-rootfs-ext4.img"))
+      Drive(device: driveBlockDev)
     ]
-  )
-
-  let config = LaunchConfiguration(
-    memory: 512,
-    vcpu: 1,
-    machineInfo: MachineInfo(`type`: MachineInfo_Type.host),
-    serialPorts: @[
-        SerialPort(
-          driver: SerialPort_Driver.default,
-          name: "none"
-        )
-    ],
-    boot: LaunchConfiguration_Boot(kind: LaunchConfiguration_BootKind.kernel,
-                                   kernel: LaunchConfiguration_KernelBoot(
-                                     kernel: kernel,
-                                     initrd: schemas.File.createFromCap(nullCap),
-                                     cmdline: "console=ttyS0 root=/dev/sda")),
-    drives: @[]
   )
 
   echo config.pprint
   let vm = await launcher.launch(config)
 
-  let ports = await vm.serialPorts
-  echo "ports: ", ports.pprint
-  let (port, portHolder) = await instance.unwrapStreamAsPipe(ports[0])
-
-  asyncFor item in port.input.lines:
-     echo "[console] " & item.strip(leading=false)
-
-  echo portHolder.pprint
+  let port = await vm.serialPort(0)
+  let portRef = await port.castAs(Persistable).createSturdyRef(nullCap, true)
+  echo portRef.formatSturdyRef
 
 when isMainModule:
   main().runMain
