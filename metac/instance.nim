@@ -1,8 +1,9 @@
-import metac/schemas, caprpc, posix, reactor, reactor/unix, os
+import metac/schemas, caprpc, posix, reactor, reactor/unix, os, tables, collections
 
 type
   Instance* = ref object
     rpcSystem: RpcSystem
+    localRequests*: TableRef[string, RootRef] # for castToLocal
     address*: string
     thisNode*: Node
     thisNodeAdmin*: NodeAdmin
@@ -22,6 +23,7 @@ proc newInstance*(address: string): Future[Instance] {.async.} =
   let self = Instance()
   self.isAdmin = getuid() == 0
   self.address = address
+  self.localRequests = newTable[string, RootRef]()
 
   var conn: BytePipe
   if self.isAdmin:
@@ -77,6 +79,27 @@ proc runService*(sinstance: ServiceInstance, service: Service, adminBootstrap: S
 
 converter toInstance*(s: ServiceInstance): Instance =
   return s.instance
+
+### castToLocal
+
+template enableCastToLocal*(T) =
+  proc registerLocal*(self: T, key: string) {.async.} =
+    if key notin self.instance.toInstance.localRequests:
+      asyncRaise "invalid key"
+
+    self.instance.toInstance.localRequests[key] = self
+
+proc toLocal*[T, R](instance: Instance, self: T, target: typedesc[R]): Future[R] {.async.} =
+  let key = hexUrandom(16)
+  instance.localRequests[key] = nil
+  await self.castAs(CastToLocal).registerLocal(key)
+  let val = instance.localRequests[key]
+  instance.localRequests.del key
+  if val == nil:
+    asyncRaise "toLocal request not completed"
+  if not (val of R):
+    asyncRaise "toLocal response bad type"
+  return val.R
 
 ###
 

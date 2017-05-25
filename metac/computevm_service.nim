@@ -14,11 +14,37 @@ type
     instance: ServiceInstance
     env: ProcessEnvironmentImpl
 
-proc launchEnv(self: ComputeVmService, envDescription: ProcessEnvironmentDescription): Future[ProcessEnvironment] {.async.} =
-  nil
+proc file(self: ProcessImpl, index: uint32): Future[Stream] {.async.} =
+  discard
 
-proc launchProcess(self: ProcessEnvironmentImpl, description: ProcessEnvironment): Future[Process] =
+proc kill(self: ProcessImpl, signal: uint32): Future[void] {.async.} =
+  discard
+
+proc returnCode(self: ProcessImpl, ): Future[int32] {.async.} =
+  discard
+
+proc wait(self: ProcessImpl, ): Future[void] {.async.} =
+  discard
+
+capServerImpl(ProcessImpl, [Process])
+
+proc launchProcess(self: ProcessEnvironmentImpl, processDescription: ProcessDescription): Future[Process] {.async.} =
+  discard
+
+proc network(self: ProcessEnvironmentImpl, index: uint32): Future[L2Interface] {.async.} =
+  discard
+
+capServerImpl(ProcessEnvironmentImpl, [ProcessEnvironment])
+
+proc launchEnv(self: ComputeVmService, envDescription: ProcessEnvironmentDescription): Future[ProcessEnvironment] {.async.} =
+  let env = ProcessEnvironmentImpl(instance: self.instance)
+
+  return env.asProcessEnvironment
+
+proc launchProcess(self: ProcessEnvironmentImpl, description: ProcessEnvironment): Future[Process] {.async.} =
   let process = ProcessImpl(instance: self.instance, env: self)
+
+  return process.asProcess
 
 proc launch(self: ComputeVmService, processDescription: ProcessDescription,
             envDescription: ProcessEnvironmentDescription): Future[ComputeLauncher_launch_Result] {.async.} =
