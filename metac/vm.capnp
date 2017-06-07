@@ -26,7 +26,7 @@ struct LaunchConfiguration {
 
   boot @0 :Boot;
 
-  memory @1 :Int32;
+  memory @1 :UInt32;
   # Available memory, in MiB
 
   vcpu @2 :Int32;

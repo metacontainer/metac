@@ -4,37 +4,54 @@ using Metac = import "metac.capnp";
 using Stream = import "stream.capnp".Stream;
 
 interface Sink {
-    bindTo (source :Source) -> (holder :Holder);
+    # Represents a sound sink (e.g. a speaker).
 
-    rtpStream @0 () -> (stream :Stream);
+    info @0 () -> (info :SoundDeviceInfo);
+
+    bindTo @1 (source :Source) -> (holder :Metac.Holder);
+    # Bind this sink to a source.
+
+    opusStream @2 () -> (stream :Stream);
+    # Returns stream accepting audio in OPUS format
 }
 
 interface Source {
-    bindTo (sink :Sink) -> (holder :Holder);
+    # Represents a sound source (e.g. a microphone).
 
-    rtpStream @0 () -> (stream :Stream);
+    info @0 () -> (info :SoundDeviceInfo);
+
+    opusStream @1 () -> (stream :Stream);
+    # Returns stream outputing audio in OPUS format.
 }
 
-interface HardwareSink extends (Sink) {
-    id @0 () -> (id :Text);
+struct SoundDeviceInfo {
+   name @0 :Text;
+   # Name of this device
+
+   isHardware @1 :Bool;
+   # Is this real device?
 }
 
-interface HardwareSource extends (Source) {
-    id @0 () -> (id :Text);
-}
 
 interface Mixer {
     # Represents a sound mixer (e.g. PulseAudio instance).
 
-    getMixedSink @0 () -> (sink :Sink);
+    createSink @0 (name :Text) -> (source :Source);
+    # Create a new sink. Return source which emits sound played on this sink.
 
-    getMixedSource @1 () -> (sink :Sink);
+    createSource @1 (name :Text) -> (sink :Sink);
+    # Create a new source. Audio played on the returned sink will be emitted on this source.
 
-    getSinks @2 () -> (sinks :List(HardwareSink))
+    getSinks @2 () -> (sinks :List(Sink));
+    # Get list of currently connected sinks.
 
-    getSources @2 () -> (source :List(HardwareSource))
+    getSources @3 () -> (source :List(Source));
+    # Get list of currently connected sources.
 }
 
 interface SoundServerAdmin {
-    getDefaultMixer @0 () -> (mixer :Mixer);
+    getSystemMixer @0 () -> (mixer :Mixer);
+    # Get system mixer.
+    #
+    # The default implementation starts a new PulseAudio instance.
 }

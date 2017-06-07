@@ -27,6 +27,24 @@ struct MetacSturdyRef {
   objectInfo @2 :AnyPointer;
 }
 
+struct TypedAnyPointer {
+  type @0 :UInt64;
+  val @1 :AnyPointer;
+}
+
+struct NewMetacSturdyRef {
+  # SturdyRef is a saved (possibly persistent) capability identifier.
+
+  node @0 :List(NodeAddress);
+  # Any of these nodes should be able to restore this ref.
+
+  service @1 :ServiceId;
+  objectInfo @2 :AnyPointer;
+
+  extra @3 :List(TypedAnyPointer);
+  # Extra information, for e.g. restoring the capability using a local plugin.
+}
+
 ### Bootstrap interfaces
 
 interface ServiceAdmin {}
