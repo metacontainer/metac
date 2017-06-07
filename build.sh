@@ -59,7 +59,7 @@ get_dep capnp https://github.com/zielmicha/capnp.nim a97d38abbcd5428f613a291f973
 get_dep cligen https://github.com/c-blake/cligen 493e06338b3fd0b740629823f347b73e5e6853f9 ''
 get_dep collections https://github.com/zielmicha/collections.nim ab4ad35f0cab08e01a16cd54a0c16938a18ba10a ''
 get_dep morelinux https://github.com/zielmicha/morelinux ff304c289f18664051398b1f8817b1a3bd63dac8 ''
-get_dep reactor https://github.com/zielmicha/reactor.nim 93f3ba85b8659977deff9f8025389f03ff029522 ''
+get_dep reactor https://github.com/zielmicha/reactor.nim b3fe3110c8e3392191e2bb2cbab08b03e08d4602 ''
 
 echo '# reactor.nim requires pthreads
 threads: "on"
@@ -68,8 +68,7 @@ threads: "on"
 passC: "-g"
 passL: "-g"
 
-cc: clang
-passC: "-fsanitize-trap=null"
+# cc: clang
 
 verbosity: "0"
 hint[ConvFromXtoItselfNotNeeded]: "off"
@@ -87,7 +86,8 @@ d:caprpcPrintExceptions
   clang.options.always = "-w -fno-strict-overflow"
   clang.cpp.options.always = "-w -fno-strict-overflow"
 
-  passC:"-ffunction-sections -fdata-sections -flto -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2 -fsanitize=null"
+  passC: "-fsanitize-trap=null -fsanitize-trap=shift"
+  passC:"-ffunction-sections -fdata-sections -flto -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2"
   passL:"-Wl,--gc-sections -flto -fPIE"
 
   obj_checks: on
