@@ -22,7 +22,8 @@ proc main*() {.async.} =
     machineInfo: MachineInfo(`type`: MachineInfo_Type.host),
     serialPorts: @[
         SerialPort(
-          driver: SerialPort_Driver.default
+          driver: SerialPort_Driver.default,
+          nowait: true
         )
     ],
     boot: LaunchConfiguration_Boot(kind: LaunchConfiguration_BootKind.kernel,
@@ -31,6 +32,9 @@ proc main*() {.async.} =
                                      initrd: nullCap,
                                      cmdline: "console=ttyS0 root=/dev/sda")),
     #boot: LaunchConfiguration_Boot(kind: LaunchConfiguration_BootKind.disk),
+    networks: @[
+      Network(driver: Network_Driver.virtio, network: nullCap)
+    ],
     drives: @[
       Drive(device: driveBlockDev)
     ]
@@ -40,7 +44,7 @@ proc main*() {.async.} =
   let vm = await launcher.launch(config)
 
   let port = await vm.serialPort(0)
-  let portRef = await port.castAs(Persistable).createSturdyRef(nullCap, true)
+  let portRef = await port.castAs(Persistable).createSturdyRef(nullCap, false)
   echo portRef.formatSturdyRef
 
 when isMainModule:

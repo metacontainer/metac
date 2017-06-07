@@ -1,4 +1,4 @@
-import os, reactor, caprpc, metac/instance, metac/schemas, collections, posix, reactor/process, reactor/file
+import os, reactor, caprpc, metac/instance, metac/schemas, collections, posix, reactor/process, reactor/file, metac/process_util
 import metac/stream, metac/fs, metac/persistence
 
 type
@@ -9,6 +9,7 @@ type
     instance: ServiceInstance
     process: process.Process
     cleanupProcs: seq[proc()]
+    holders: seq[Holder]
 
     serialPorts: seq[Stream]
     networks: seq[L2Interface]
@@ -52,7 +53,7 @@ proc destroy(self: VMImpl): Future[void] {.async.} =
 capServerImpl(VMImpl, [VM, Persistable])
 
 proc launchVM(instance: ServiceInstance, config: LaunchConfiguration, persistenceDelegate: PersistenceDelegate=nil): Future[VM] {.async.} =
-  let vm = VMImpl(instance: instance, cleanupProcs: @[], serialPorts: @[], networks: @[], persistenceDelegate: persistenceDelegate)
+  let vm = VMImpl(instance: instance, cleanupProcs: @[], serialPorts: @[], networks: @[], persistenceDelegate: persistenceDelegate, holders: @[])
   var cmdline = @["qemu-system-x86_64",
                   "-enable-kvm",
                   "-nographic",
@@ -85,6 +86,9 @@ proc launchVM(instance: ServiceInstance, config: LaunchConfiguration, persistenc
   else:
     asyncRaise("unsupported boot method")
 
+  # rng
+  cmdline &= ["-device", "virtio-rng-pci"]
+
   # memory
   cmdline &= ["-m", $config.memory]
 
@@ -94,7 +98,29 @@ proc launchVM(instance: ServiceInstance, config: LaunchConfiguration, persistenc
   # machineInfo
   cmdline &= getMachineType(config.machineInfo)
 
+  let networkAdmin = instance.getServiceAdmin("network", NetworkServiceAdmin)
+
   # networks
+  for i, network in config.networks:
+    let tapName = "mcvm" & hexUrandom(5)
+    let driver = case network.driver:
+                   of Network_Driver.e1000: "e1000"
+                   of Network_Driver.virtio: "virtio-net-pci"
+
+    await execCmd(@["ip", "tuntap", "add", "dev", tapName, "mode", "tap"])
+
+    # TODO(perf): vhost=on
+    cmdline &= ["-netdev", "tap,ifname=$1,script=no,downscript=no,id=metacnet$2" % [tapName, $i]]
+    cmdline &= ["-device", "$1,netdev=metacnet$2" % [driver, $i]]
+
+    let theDevice = await networkAdmin.rootNamespace.getInterface(tapName).l2interface
+
+    if network.network.toCapServer.isNullCap:
+      vm.networks.add theDevice
+    else:
+      let holder = await theDevice.bindTo(network.network)
+      vm.holders.add(holder)
+      vm.networks.add network.network
 
   # drives
   for i, drive in config.drives:

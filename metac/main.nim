@@ -3,7 +3,7 @@ import os, strutils, reactor, collections
 import metac/cli_common
 import metac/vm, metac/fs, metac/persistence_service, metac/computevm_service, metac/network_service
 import metac/fs_cli, metac/stream_cli, metac/network_cli
-import tests/vm_test
+import tests/vm_test, tests/compute_test
 
 dispatchSubcommand({
   "fs": (() => fs_cli.main()),
@@ -18,4 +18,5 @@ dispatchSubcommand({
   "network-service": (() => network_service.main().runMain),
 
   "vm-test": (() => vm_test.main().runMain()),
+  "compute-test": (() => compute_test.main().runMain()),
 })

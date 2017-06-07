@@ -152,8 +152,10 @@ proc listInterfaces(self: KernelNetworkNamespaceImpl): Future[seq[KernelInterfac
 proc createInterface(self: KernelNetworkNamespaceImpl, name: string): Future[KernelInterface] {.async.} =
   let p = self.instance.makePersistenceDelegate("net:newlocalnet", description=name.toAnyPointer, runtimeId=nil)
 
-  return KernelInterfaceImpl(instance: self.instance, isReal: false, name: name,
-                             persistenceDelegate: p).asKernelInterface
+  let iface = KernelInterfaceImpl(instance: self.instance, isReal: false, name: name,
+                                  persistenceDelegate: p)
+  discard await iface.setupBridgeFor # create the interface now
+  return iface.asKernelInterface
 
 capServerImpl(KernelNetworkNamespaceImpl, [KernelNetworkNamespace])
 

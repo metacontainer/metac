@@ -55,10 +55,11 @@ get_dep() {
 
 echo "path: \".\"" > nim.cfg
 
-get_dep capnp https://github.com/zielmicha/capnp.nim 105da27725c354b6b9a0faaa99841a53f9e05eb9 ''
+get_dep capnp https://github.com/zielmicha/capnp.nim a97d38abbcd5428f613a291f9730d1400db4f176 ''
 get_dep cligen https://github.com/c-blake/cligen 493e06338b3fd0b740629823f347b73e5e6853f9 ''
 get_dep collections https://github.com/zielmicha/collections.nim ab4ad35f0cab08e01a16cd54a0c16938a18ba10a ''
-get_dep reactor https://github.com/zielmicha/reactor.nim eab8cf8b58e626512159c700e545c80ad88bca20 ''
+get_dep morelinux https://github.com/zielmicha/morelinux ff304c289f18664051398b1f8817b1a3bd63dac8 ''
+get_dep reactor https://github.com/zielmicha/reactor.nim 93f3ba85b8659977deff9f8025389f03ff029522 ''
 
 echo '# reactor.nim requires pthreads
 threads: "on"
@@ -66,6 +67,9 @@ threads: "on"
 # enable debugging
 passC: "-g"
 passL: "-g"
+
+cc: clang
+passC: "-fsanitize-trap=null"
 
 verbosity: "0"
 hint[ConvFromXtoItselfNotNeeded]: "off"
@@ -83,7 +87,7 @@ d:caprpcPrintExceptions
   clang.options.always = "-w -fno-strict-overflow"
   clang.cpp.options.always = "-w -fno-strict-overflow"
 
-  passC:"-ffunction-sections -fdata-sections -flto -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2"
+  passC:"-ffunction-sections -fdata-sections -flto -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2 -fsanitize=null"
   passL:"-Wl,--gc-sections -flto -fPIE"
 
   obj_checks: on
