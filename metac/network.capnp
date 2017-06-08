@@ -1,8 +1,5 @@
 @0xa47827dc459cb6c6;
 
-using Cxx = import "/capnp/c++.capnp";
-$Cxx.namespace("metac::network");
-
 using Metac = import "metac.capnp";
 using Persistence = import "persistence.capnp";
 

@@ -1,8 +1,5 @@
 @0xd73ed8e6c5ada477;
 
-using Cxx = import "/capnp/c++.capnp";
-$Cxx.namespace("metac");
-
 ### Common structs
 
 struct NodeAddress {

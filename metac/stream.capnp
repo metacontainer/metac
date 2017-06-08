@@ -1,8 +1,5 @@
 @0xc75eeff875deb52e;
 
-using Cxx = import "/capnp/c++.capnp";
-$Cxx.namespace("metac");
-
 using Metac = import "metac.capnp";
 
 interface Stream {

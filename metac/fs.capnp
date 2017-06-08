@@ -1,8 +1,5 @@
 @0xe669517eda764a9f;
 
-using Cxx = import "/capnp/c++.capnp";
-$Cxx.namespace("metac::fs");
-
 using Metac = import "metac.capnp";
 using Stream = import "stream.capnp".Stream;
 using BlockDevice = import "blockdevice.capnp".BlockDevice;

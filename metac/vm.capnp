@@ -1,8 +1,5 @@
 @0xc1122ecaf8f1f29e;
 
-using Cxx = import "/capnp/c++.capnp";
-$Cxx.namespace("metac::vm");
-
 using Metac = import "metac.capnp";
 using Net = import "network.capnp";
 using Stream = import "stream.capnp".Stream;
