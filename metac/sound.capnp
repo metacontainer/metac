@@ -34,7 +34,13 @@ interface Mixer {
     createSource @1 (name :Text) -> (sink :SoundDevice);
     # Create a new source. Audio played on the returned sink will be emitted on this source.
 
-    getDevice @2 () -> (sinks :List(SoundDevice));
+    getSink @2 (name :Text) -> (sink :SoundDevice);
+    # Get sink by name.
+
+    getSource @3 (name :Text) -> (source :SoundDevice);
+    # Get sink by name.
+
+    getDevices @4 () -> (devs :List(SoundDevice));
     # Get list of currently connected sinks.
 }
 

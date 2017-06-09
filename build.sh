@@ -55,30 +55,31 @@ get_dep() {
 
 echo "path: \".\"" > nim.cfg
 
-get_dep capnp https://github.com/zielmicha/capnp.nim a97d38abbcd5428f613a291f9730d1400db4f176 ''
+get_dep capnp https://github.com/zielmicha/capnp.nim e17e7fd31ee4cfe3a2280fc9cd45fe2511658e50 ''
 get_dep cligen https://github.com/c-blake/cligen 493e06338b3fd0b740629823f347b73e5e6853f9 ''
 get_dep collections https://github.com/zielmicha/collections.nim ab4ad35f0cab08e01a16cd54a0c16938a18ba10a ''
-get_dep morelinux https://github.com/zielmicha/morelinux ff304c289f18664051398b1f8817b1a3bd63dac8 ''
+get_dep morelinux https://github.com/zielmicha/morelinux 65edae5c9071ad5afc002611ea8f396fee9de000 ''
 get_dep reactor https://github.com/zielmicha/reactor.nim b3fe3110c8e3392191e2bb2cbab08b03e08d4602 ''
 
 echo '# reactor.nim requires pthreads
 threads: "on"
 
+cc: clang
+
 # enable debugging
 passC: "-g"
 passL: "-g"
 
-# cc: clang
-
-verbosity: "0"
+verbosity: "1"
 hint[ConvFromXtoItselfNotNeeded]: "off"
 hint[XDeclaredButNotUsed]: "off"
 
-debugger: "native"
+#debugger: "native"
 
 threadanalysis: "off"
 
 d:caprpcPrintExceptions
+passC: "-fsanitize-trap=null -fsanitize-trap=shift"
 
 @if release:
   gcc.options.always = "-w -fno-strict-overflow"
@@ -86,7 +87,6 @@ d:caprpcPrintExceptions
   clang.options.always = "-w -fno-strict-overflow"
   clang.cpp.options.always = "-w -fno-strict-overflow"
 
-  passC: "-fsanitize-trap=null -fsanitize-trap=shift"
   passC:"-ffunction-sections -fdata-sections -flto -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2"
   passL:"-Wl,--gc-sections -flto -fPIE"
 

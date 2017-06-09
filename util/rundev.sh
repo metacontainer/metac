@@ -18,6 +18,7 @@ sleep 1
 rundev add fs-service -- ./build/metac fs-service
 rundev add vm-service -- ./build/metac vm-service
 rundev add network-service -- ./build/metac network-service
+rundev add sound-service -- ./build/metac sound-service
 sleep 1
 rundev add computevm-service -- ./build/metac computevm-service
 "

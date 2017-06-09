@@ -12,10 +12,12 @@ interface PersistenceService extends (Metac.Service) {
 interface Persistable {
   createSturdyRef @0 (rgroup :Metac.ResourceGroup, persistent :Bool) -> (id :Metac.MetacSturdyRef);
   # Create unguessable reference to this object and return it.
+}
 
-  # wait @1 ();
+interface Waitable {
+  wait @0 ();
   # Wait until the held object is destroyed.
-  # In case of failure (e.g. host responsible for this cap is rebooted) errors should be returned.
+  # In case of failure (e.g. host responsible for this cap is rebooted) error should be returned.
 }
 
 # For service authors.

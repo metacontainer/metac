@@ -53,8 +53,17 @@ proc wrapStream*(instance: Instance, getStream: (proc(): Future[BytePipe])): sch
       local: instance.nodeAddress,
       port: servAddr.port.int32,
       holder: holder[void]())
-  
-  let cap = schemas.Stream.inlineCap(StreamInlineImpl(tcpListen: tcpListenImpl))
+
+  proc bindToImpl(other: Stream): Future[Holder] {.async.} =
+    # TODO: leak (return correct holder)
+
+    let thisPipe = await getStream()
+    let (otherPipe, holder) = await instance.unwrapStreamAsPipe(other)
+    await pipe(otherPipe, thisPipe)
+
+    return holder
+
+  let cap = schemas.Stream.inlineCap(StreamInlineImpl(tcpListen: tcpListenImpl, bindTo: bindToImpl))
   return cap
 
 proc wrapStream*(instance: Instance, stream: BytePipe): schemas.Stream =
