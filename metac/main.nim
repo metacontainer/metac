@@ -6,7 +6,8 @@ import metac/fs_cli, metac/stream_cli, metac/network_cli, metac/sound_cli
 import tests/vm_test, tests/compute_test
 
 dispatchSubcommand({
-  "fs": (() => fs_cli.main()),
+  "file": (() => fs_cli.mainFile()),
+  "fs": (() => fs_cli.mainFs()),
   "net": (() => network_cli.main()),
   "stream": (() => stream_cli.main()),
   "network": (() => network_cli.main()),

@@ -1,6 +1,19 @@
-import os, collections, sequtils
+import os, collections, sequtils, reactor, cligen
 
 var argv*: seq[string] = commandLineParams()
+
+template defineExporter*(name, makeuri) =
+  proc name(uri: string, persistent=false) =
+    if uri == nil:
+      quit("missing required parameter")
+
+    asyncMain:
+      let instance = await newInstance()
+      let file = await makeuri(instance, uri)
+      let sref = await file.castAs(schemas.Persistable).createSturdyRef(nullCap, persistent)
+      echo sref.formatSturdyRef
+
+  dispatchGen(name)
 
 proc dispatchSubcommand*[T](handlers: openarray[(string, T)]) =
   # use T instead of proc() to workaround {.locks: <unknown>.}

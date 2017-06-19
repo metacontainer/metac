@@ -34,7 +34,9 @@ interface FilesystemServiceAdmin {
 }
 
 interface Mount {
-  # Persistable
+  info @0 () -> (path :Text);
+
+  destroy @1 ();
 }
 
 interface FilesystemNamespace {
@@ -42,6 +44,7 @@ interface FilesystemNamespace {
 
   mount @1 (path :Text, fs :Filesystem) -> (mount :Mount);
   # Mounts filesystem.
+  # TODO: nodevmap mount option
 
   listMounts @2 () -> (mounts :List(Mount));
 }

@@ -20,17 +20,11 @@ proc fileFromUri*[T: schemas.File|Filesystem](instance: Instance, uri: string, t
   else:
     return root.getSubtree(path)
 
-proc exportCmd(uri: string, persistent=false) =
-  if uri == nil:
-    quit("missing required parameter")
+proc fileFromUri*(instance: Instance, uri: string): auto = return fileFromUri(instance, uri, schemas.File)
+proc fsFromUri*(instance: Instance, uri: string): auto = return fileFromUri(instance, uri, schemas.Filesystem)
 
-  asyncMain:
-    let instance = await newInstance()
-    let file = await instance.fileFromUri(uri, schemas.File)
-    let sref = await file.castAs(schemas.Persistable).createSturdyRef(nullCap, persistent)
-    echo sref.formatSturdyRef
-
-dispatchGen(exportCmd)
+defineExporter(fsExportCmd, fsFromUri)
+defineExporter(fileExportCmd, fsFromUri)
 
 proc catCmd(uri: string) =
   if uri == nil:
@@ -46,8 +40,29 @@ proc catCmd(uri: string) =
 
 dispatchGen(catCmd)
 
-proc main*() =
+proc mountCmd(uri: string, path: string, persistent=false) =
+  if uri == nil or path == nil:
+    quit("missing required parameter")
+
+  asyncMain:
+    let instance = await newInstance()
+    let fs = await instance.fileFromUri(uri, schemas.Filesystem)
+    let fsService = await instance.getServiceAdmin("fs", FilesystemServiceAdmin)
+    let mnt = await fsService.rootNamespace.mount(path, fs)
+
+    let sref = await mnt.castAs(schemas.Persistable).createSturdyRef(nullCap, persistent)
+    echo sref.formatSturdyRef
+
+dispatchGen(mountCmd)
+
+proc mainFile*() =
   dispatchSubcommand({
-    "export": () => quit(dispatchExportCmd(argv, doc="")),
+    "export": () => quit(dispatchFileExportCmd(argv, doc="")),
     "cat": () => quit(dispatchCatCmd(argv, doc=""))
+  })
+
+proc mainFs*() =
+  dispatchSubcommand({
+    "export": () => quit(dispatchFsExportCmd(argv, doc="")),
+    "mount": () => quit(dispatchMountCmd(argv, doc=""))
   })

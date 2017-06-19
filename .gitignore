@@ -17,3 +17,4 @@ nimcache/
 *.ndb
 
 /doc
+/persistence.db

@@ -23,4 +23,5 @@ proc main*() {.async.} =
   )
 
 when isMainModule:
+  disableFdInheritance()
   main().runMain
