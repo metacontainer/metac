@@ -16,19 +16,25 @@ type
 
   ProcessImpl = ref object of RootObj
     instance: ServiceInstance
+    files: seq[Stream]
+    wrapped: Process
     env: ProcessEnvironmentImpl
 
 proc file(self: ProcessImpl, index: uint32): Future[Stream] {.async.} =
-  discard
+  let index = index.int
+  if index < 0 or index >= self.files.len:
+    asyncRaise "index error"
+
+  return self.files[index]
 
 proc kill(self: ProcessImpl, signal: uint32): Future[void] {.async.} =
-  discard
+  return
 
 proc returnCode(self: ProcessImpl, ): Future[int32] {.async.} =
-  discard
+  return 0
 
 proc wait(self: ProcessImpl, ): Future[void] {.async.} =
-  discard
+  return
 
 capServerImpl(ProcessImpl, [Process])
 
@@ -42,8 +48,9 @@ capServerImpl(ProcessEnvironmentImpl, [ProcessEnvironment])
 proc randomAgentNetwork(): IpInterface =
   var arr: array[16, uint8]
   arr[0] = 0xFC
+  let d = urandom(16)
   for i in 1..15:
-    arr[i] = uint8(random(256))
+    arr[i] = uint8(d[i])
   arr[15] = arr[15] and uint8(0b11111100)
   return (arr.Ip6Address.from6, 126)
 
@@ -61,6 +68,22 @@ proc runAgentServer(env: ProcessEnvironmentImpl): Future[void] {.async.} =
   discard newTwoPartyServer(conn, inlineCap(AgentBootstrap, AgentBootstrapInlineImpl(
     init: agentInit
   )).toCapServer)
+
+proc proxyStream(self: ProcessEnvironmentImpl, stream: Stream): Stream =
+  proc getStream(): Future[BytePipe] =
+    return self.instance.unwrapStreamAsPipe(stream)
+
+  let fakeInstance = Instance(address: $self.myAddress)
+  return fakeInstance.wrapStream(getStream)
+
+proc proxyFs(self: ProcessEnvironmentImpl, fs: Filesystem): Filesystem =
+  proc v9fsStreamImpl: Future[Stream] {.async.} =
+    let stream = await fs.v9fsStream()
+    return proxyStream(self, stream)
+
+  return inlineCap(Filesystem, FilesystemInlineImpl(
+    v9fsStream: v9fsStreamImpl
+  ))
 
 proc launchEnv(self: ComputeVmService, envDescription: ProcessEnvironmentDescription): Future[ProcessEnvironment] {.async.} =
   let env = ProcessEnvironmentImpl(instance: self.instance)
@@ -82,11 +105,15 @@ proc launchEnv(self: ComputeVmService, envDescription: ProcessEnvironmentDescrip
   env.myAddress = agentIpNetwork.nthAddress(1)
   env.agentAddress = agentIpNetwork.nthAddress(2)
 
-  cmdline &= " metac.agentaddress=" & $(env.agentAddress) & " metac.serviceaddress=" & $(env.myAddress) & " metac.agentnetwork=" & ($agentIpNetwork)
+  cmdline &= " metac.agentaddress=" & $(env.agentAddress) & " metac.serviceaddress=" & $(env.myAddress) & " metac.agentnetwork=" & ($agentIpNetwork) & " quiet"
+  # Duplicate Address Discovery may cause bind to fail with "address not available" and is not applicable here
   await execCmd(@["sysctl", "-w", "net.ipv6.conf." & localDevName & ".accept_dad=0"])
   await execCmd(@["sysctl", "-w", "net.ipv6.conf." & localDevName & ".forwarding=1"])
   await execCmd(@["ip", "address", "add", ($env.myAddress) & "/126", "dev", localDevName])
+  await execCmd(@["ip", "address", "show", "dev", localDevName])
 
+  for mount in envDescription.filesystems:
+    mount.fs = proxyFs(env, mount.fs)
 
   let vmConfig = LaunchConfiguration(
     memory: envDescription.memory,
@@ -118,11 +145,9 @@ proc launchEnv(self: ComputeVmService, envDescription: ProcessEnvironmentDescrip
 
   proc serialPortHandler() {.async.} =
     let portStream = await vm.serialPort(0)
-    let (port, holder) = await self.instance.unwrapStreamAsPipe(portStream)
+    let port = await self.instance.unwrapStreamAsPipe(portStream)
     asyncFor line in port.input.lines:
       echo "[vm] ", line.strip(leading=false)
-
-    fakeUsage(holder)
 
   serialPortHandler().ignore
 
@@ -132,7 +157,27 @@ proc launchProcess(self: ProcessEnvironmentImpl, description: ProcessDescription
   if description.isNil:
     return nullCap
 
-  let process = ProcessImpl(instance: self.instance, env: self)
+  if description.files == nil: description.files = @[]
+  if description.args == nil: description.args = @[]
+
+  if description.args.len < 1: asyncRaise "missing args"
+
+  let process = ProcessImpl(instance: self.instance, env: self, files: @[])
+
+  # Fill in null files
+  for i in 0..<description.files.len:
+    if description.files[i].stream.isNil:
+      let (a, b) = newStreamPair(self.instance)
+      process.files.add a
+      description.files[i].stream = b
+    else:
+      process.files.add nullCap
+
+    description.files[i].stream = proxyStream(self, description.files[i].stream)
+
+  let agentEnv = await self.agentEnv.getFuture
+  let wrappedProcess = await agentEnv.launchProcess(description)
+  process.wrapped = wrappedProcess
   return process.asProcess
 
 proc launch(self: ComputeVmService, processDescription: ProcessDescription,

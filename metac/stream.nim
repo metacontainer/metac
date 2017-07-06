@@ -22,9 +22,14 @@ proc unwrapStream*(instance: Instance, stream: schemas.Stream): Future[tuple[fd:
   ## Turns (possibly remote) Stream into file descriptor.
   return unwrapStreamBase(instance, stream, connectTcpAsFd)
 
-proc unwrapStreamAsPipe*(instance: Instance, stream: schemas.Stream): Future[tuple[fd: BytePipe, holder: Holder]] {.async.} =
+proc unwrapStreamAsPipe*(instance: Instance, stream: schemas.Stream): Future[BytePipe] {.async.} =
   ## Turn (possibly remote) Stream into local BytePipe.
-  return unwrapStreamBase(instance, stream, connectTcp)
+  let (pipe, holder) = unwrapStreamBase(instance, stream, connectTcp)
+
+  type PipeAndHolder = ref object of BytePipe
+    holder: Holder
+
+  return PipeAndHolder(input: pipe.input, output: pipe.output, holder: holder)
 
 proc wrapStream*(instance: Instance, getStream: (proc(): Future[BytePipe])): schemas.Stream =
   proc acceptConnections(remote: schemas.NodeAddress, port: int32, server: TcpServer): Future[void] {.async.} =
@@ -59,10 +64,10 @@ proc wrapStream*(instance: Instance, getStream: (proc(): Future[BytePipe])): sch
     # TODO: leak (return correct holder)
 
     let thisPipe = await getStream()
-    let (otherPipe, holder) = await instance.unwrapStreamAsPipe(other)
+    let otherPipe = await instance.unwrapStreamAsPipe(other)
     await pipe(otherPipe, thisPipe)
 
-    return holder
+    return nullCap
 
   let cap = schemas.Stream.inlineCap(StreamInlineImpl(tcpListen: tcpListenImpl, bindTo: bindToImpl))
   return cap
@@ -70,6 +75,10 @@ proc wrapStream*(instance: Instance, getStream: (proc(): Future[BytePipe])): sch
 proc wrapStream*(instance: Instance, stream: BytePipe): schemas.Stream =
   # TODO: if there is more than one connection, things break
   return wrapStream(instance, () => now(just(stream)))
+
+proc newStreamPair*(instance: Instance): tuple[a: Stream, b: Stream] =
+  let (a, b) = newPipe(byte)
+  return (wrapStream(instance, a), wrapStream(instance, b))
 
 proc wrapUnixSocketAsStream*(instance: Instance, path: string): schemas.Stream =
   var buf: Stat
@@ -101,7 +110,7 @@ proc unwrapStreamToUnixSocket*(instance: Instance, stream: schemas.Stream): Futu
       server.incomingConnections.recvClose JustClose
 
     let conn = await server.incomingConnections.receive
-    let (unwrappedStream, holder) = await instance.unwrapStreamAsPipe(stream)
+    let unwrappedStream = await instance.unwrapStreamAsPipe(stream)
     await pipe(conn.BytePipe, unwrappedStream)
 
   handler().ignore

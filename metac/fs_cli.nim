@@ -34,7 +34,7 @@ proc catCmd(uri: string) =
     let instance = await newInstance()
     let file = await instance.fileFromUri(uri, schemas.File)
     let stream = await file.openAsStream()
-    let (fd, holder) = await instance.unwrapStreamAsPipe(stream)
+    let fd = await instance.unwrapStreamAsPipe(stream)
     let data = await fd.input.readUntilEof()
     echo data
 

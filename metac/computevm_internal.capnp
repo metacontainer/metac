@@ -3,7 +3,7 @@
 using Compute = import "compute.capnp";
 
 interface AgentEnv {
-
+  launchProcess @0 (description :Compute.ProcessDescription) -> (process :Compute.Process);
 }
 
 interface AgentBootstrap {

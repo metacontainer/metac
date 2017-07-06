@@ -7,7 +7,7 @@ proc catCmd(uri: string) =
   asyncMain:
     let instance = await newInstance()
     let stream = await instance.restore(parseSturdyRef(uri)).castAs(Stream)
-    let (fd, holder) = await instance.unwrapStreamAsPipe(stream)
+    let fd = await instance.unwrapStreamAsPipe(stream)
     asyncFor line in fd.input.lines:
       echo line.strip(leading=false)
 

@@ -22,9 +22,9 @@ proc listMounts(ns: LocalNamespace): Future[seq[Mount]] {.async.}
 
 capServerImpl(LocalNamespace, [FilesystemNamespace, Persistable])
 
-proc mount(ns: LocalNamespace, path: string, fs: Filesystem): Future[Mount] {.async.} =
+proc mount*(instance: Instance, path: string, fs: Filesystem): Future[Holder] {.async.} =
   let stream = await fs.v9fsStream
-  let (fd, holder) = await ns.instance.unwrapStream(stream)
+  let (fd, holder) = await instance.unwrapStream(stream)
 
   var buf: Stat
   if stat(path, buf) != 0 and errno == posix.EIO:
@@ -34,6 +34,11 @@ proc mount(ns: LocalNamespace, path: string, fs: Filesystem): Future[Mount] {.as
   echo "mounting..."
   let process = startProcess(@["mount", "-t", "9p", "-o", "trans=fd,rfdno=4,wfdno=4,uname=root,aname=/,access=client", "none", "/" & path],
                              additionalFiles= @[(4.cint, fd.cint), (2.cint, 2.cint)])
+
+  return holder
+
+proc mount(ns: LocalNamespace, path: string, fs: Filesystem): Future[Mount] {.async.} =
+  let holder = await mount(ns.instance, path, fs)
 
   return LocalFsMount(
     v9fsStreamHolder: holder,

@@ -1,16 +1,31 @@
-import metac, metac/schemas, collections
+import metac, metac/schemas, metac/fs_cli, collections, metac/stream
 
 proc main*() {.async.} =
   let instance = await newInstance()
   let launcher = await instance.getServiceAdmin("computevm", ComputeLauncher)
+  let dir = await fsFromUri(instance, "local:/bin")
 
   let config = ProcessEnvironmentDescription(
     memory: 512,
-    filesystems: @[],
+    filesystems: @[
+      FsMount(path: "/bin", fs: dir)
+    ],
     networks: @[]
   )
 
-  let env = await launcher.launch(nil, config)
+  let processConfig = ProcessDescription(
+    args: @["/bin/busybox", "echo", "hello hello hello hello"],
+    files: @[FD(), FD()]
+  )
+
+  let r = await launcher.launch(processConfig, config)
+  let (env, process) = (r.env, r.process)
+
+  # read from stdout
+  let stdout = await process.file(1)
+  let pipe = await instance.unwrapStreamAsPipe(stdout)
+  asyncFor line in pipe.input.lines:
+    echo "[out]", line.strip(leading=true)
 
 when isMainModule:
   main().runMain

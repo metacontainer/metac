@@ -1,4 +1,4 @@
-import metac/instance, metac/schemas, reactor, capnp, caprpc, os, times, collections, metac/computevm_internal_schema, posix
+import metac/instance, metac/schemas, reactor, capnp, caprpc, os, times, collections, metac/computevm_internal_schema, posix, metac/fs, reactor/process, metac/stream
 
 proc parseKernelCmdline(line: string): TableRef[string, string] =
   result = newTable[string, string]()
@@ -11,8 +11,42 @@ proc shutdown =
   discard execShellCmd("echo o > /proc/sysrq-trigger")
   sleep(5000)
 
-type AgentEnvImpl = ref object of RootObj
-  discard
+type
+  AgentEnvImpl = ref object of RootObj
+    instance: Instance
+
+  ProcessImpl = ref object of RootObj
+    process: process.Process
+    holders: seq[Holder]
+
+proc file(self: ProcessImpl, index: uint32): Future[Stream] {.async.} =
+  return nullCap
+
+proc kill(self: ProcessImpl, signal: uint32): Future[void] {.async.} =
+  return
+
+proc returnCode(self: ProcessImpl, ): Future[int32] {.async.} =
+  return 0
+
+proc wait(self: ProcessImpl, ): Future[void] {.async.} =
+  return
+
+capServerImpl(ProcessImpl, [schemas.Process])
+
+proc launchProcess(self: AgentEnvImpl, d: ProcessDescription): Future[schemas.Process] {.async.} =
+  var additionalFiles: seq[tuple[target: cint, src: cint]] = @[]
+
+  defer:
+    for f in additionalFiles:
+      discard close(f.src)
+
+  for i, fd in d.files:
+    let (unwrappedFd, holder) = await self.instance.unwrapStream(fd.stream)
+    additionalFiles.add((i.cint, unwrappedFd))
+
+  let process = startProcess(d.args, additionalFiles = additionalFiles)
+
+  return ProcessImpl(process: process).asProcess
 
 capServerImpl(AgentEnvImpl, [AgentEnv])
 
@@ -29,17 +63,16 @@ mount -t devpts pts /dev/pts
 
   let options = parseKernelCmdline(readFile("/proc/cmdline"))
 
-
-  #doAssert 0 == execShellCmd("echo ip link set dev eth0 up")
-  #doAssert 0 == execShellCmd("echo ip address add $1/126 dev eth0" % options["metac.agentaddress"])
-  #doAssert 0 == execShellCmd("echo ip route add $1 dev eth0" % ($options["metac.agentnetwork"]))
-
   doAssert 0 == execShellCmd("sysctl -w net.ipv6.conf.eth0.accept_dad=0")
   doAssert 0 == execShellCmd("ip link set dev lo up")
   doAssert 0 == execShellCmd("ip link set dev eth0 up")
   doAssert 0 == execShellCmd("ip address add $1/126 dev eth0" % options["metac.agentaddress"])
+  doAssert 0 == execShellCmd("ip -6 route add default via $1" % options["metac.serviceaddress"])
 
-  let env = AgentEnvImpl()
+  let env = AgentEnvImpl(
+    # simplified instance
+    instance: Instance(address: options["metac.agentaddress"])
+  )
 
   await asyncSleep(1000)
   echo "connecting (", options["metac.serviceaddress"], ")..."
@@ -47,7 +80,19 @@ mount -t devpts pts /dev/pts
   echo "done"
   let bootstrapCap = await newTwoPartyClient(conn).bootstrap.castAs(AgentBootstrap)
   let envDescription = await bootstrapCap.init(env.asAgentEnv)
-  echo envDescription.pprint
+
+  var holders: seq[Holder] = @[]
+
+  echo "mounting filesystems..."
+  for fs in envDescription.filesystems:
+    echo fs.path, "..."
+    let holder = await mount(env.instance, fs.path, fs.fs)
+    holders.add holder
+
+  echo "setup done"
+  await waitForever()
+
+  fakeUsage holders
 
 proc forkAgent =
   let agentPid = fork()
