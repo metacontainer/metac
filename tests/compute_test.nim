@@ -14,7 +14,7 @@ proc main*() {.async.} =
   )
 
   let processConfig = ProcessDescription(
-    args: @["/bin/busybox", "echo", "hello hello hello hello"],
+    args: @["/bin/busybox", "sh", "-c", "echo hello hello hello hello; ls /bin; cat /proc/mounts"],
     files: @[FD(), FD()]
   )
 

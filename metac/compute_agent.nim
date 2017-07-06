@@ -14,6 +14,7 @@ proc shutdown =
 type
   AgentEnvImpl = ref object of RootObj
     instance: Instance
+    ready: Future[void]
 
   ProcessImpl = ref object of RootObj
     process: process.Process
@@ -34,6 +35,8 @@ proc wait(self: ProcessImpl, ): Future[void] {.async.} =
 capServerImpl(ProcessImpl, [schemas.Process])
 
 proc launchProcess(self: AgentEnvImpl, d: ProcessDescription): Future[schemas.Process] {.async.} =
+  await self.ready
+
   var additionalFiles: seq[tuple[target: cint, src: cint]] = @[]
 
   defer:
@@ -49,6 +52,8 @@ proc launchProcess(self: AgentEnvImpl, d: ProcessDescription): Future[schemas.Pr
   return ProcessImpl(process: process).asProcess
 
 capServerImpl(AgentEnvImpl, [AgentEnv])
+
+proc chroot(path: cstring): cint {.importc, header: "<unistd.h>".}
 
 proc main {.async.} =
   doAssert 0 == execShellCmd("""
@@ -69,9 +74,11 @@ mount -t devpts pts /dev/pts
   doAssert 0 == execShellCmd("ip address add $1/126 dev eth0" % options["metac.agentaddress"])
   doAssert 0 == execShellCmd("ip -6 route add default via $1" % options["metac.serviceaddress"])
 
+  let readyCompleter = newCompleter[void]()
   let env = AgentEnvImpl(
     # simplified instance
-    instance: Instance(address: options["metac.agentaddress"])
+    instance: Instance(address: options["metac.agentaddress"]),
+    ready: readyCompleter.getFuture,
   )
 
   await asyncSleep(1000)
@@ -83,13 +90,23 @@ mount -t devpts pts /dev/pts
 
   var holders: seq[Holder] = @[]
 
+  createDir("/mnt")
+
+  echo envDescription.pprint
   echo "mounting filesystems..."
   for fs in envDescription.filesystems:
     echo fs.path, "..."
-    let holder = await mount(env.instance, fs.path, fs.fs)
+    createDir("/mnt/" & fs.path)
+    let holder = await mount(env.instance, "/mnt/" & fs.path, fs.fs)
     holders.add holder
 
+  # TODO: pivot_root?
+  if chroot("/mnt") != 0:
+    echo "chroot failed"
+    return
+
   echo "setup done"
+  readyCompleter.complete
   await waitForever()
 
   fakeUsage holders

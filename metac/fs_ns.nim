@@ -33,7 +33,7 @@ proc mount*(instance: Instance, path: string, fs: Filesystem): Future[Holder] {.
 
   echo "mounting..."
   let process = startProcess(@["mount", "-t", "9p", "-o", "trans=fd,rfdno=4,wfdno=4,uname=root,aname=/,access=client", "none", "/" & path],
-                             additionalFiles= @[(4.cint, fd.cint), (2.cint, 2.cint)])
+                             additionalFiles= @[(4.cint, fd.cint), (0.cint, 0.cint), (1.cint, 1.cint), (2.cint, 2.cint)])
 
   return holder
 
