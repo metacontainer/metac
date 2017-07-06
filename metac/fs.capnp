@@ -35,8 +35,6 @@ interface FilesystemServiceAdmin {
 
 interface Mount {
   info @0 () -> (path :Text);
-
-  destroy @1 ();
 }
 
 interface FilesystemNamespace {

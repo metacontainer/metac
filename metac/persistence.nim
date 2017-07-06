@@ -35,7 +35,13 @@ proc injectPersistence*[T](cap: T, delegate: PersistenceDelegate): T =
 proc injectPersistence*[T](instance: ServiceInstance, cap: T, category: string, description: AnyPointer, runtimeId: string=nil): T =
   return injectPersistence(instance, cap, makePersistenceDelegate(category, description, runtimeId))
 
+# proc callWithPersistence*[T, A](instance: ServiceInstance, cap: T, args: A, runtimeId: string = nil): auto =
+#   let delegate = makePersistenceCallDelegate(instance, cap, args, runtimeId)
+#   let retVal = cap.toCapServer.call(getInterfaceId(T), getMethodId(args), args.toAnyPointer)
+#   return injectPersistence(retVal, delegate)
+
 proc injectBasicPersistence*[T](instance: ServiceInstance, cap: T): T =
+  ## Adds basic persistence support to cap ``cap``. (Basic meaning that it only works when ``persistent`` is set to false)
   return injectPersistence(instance, cap, nil, nil, nil)
 
 proc registerRestorer*(instance: ServiceInstance, restorer: proc(description: CapDescription): Future[AnyPointer]): Future[void] =

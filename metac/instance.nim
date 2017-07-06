@@ -61,6 +61,9 @@ proc connect*(instance: Instance, address: NodeAddress): Future[Node] {.async.} 
   let rpcSystem = newRpcSystem(newTwoPartyNetwork(conn, Side.client).asVatNetwork)
   return rpcSystem.bootstrap().castAs(Node)
 
+proc `$`*(instance: Instance): string =
+  return "Instance@" & instance.address
+
 ### ServiceInstance
 
 proc newServiceInstance*(name: string): Future[ServiceInstance] {.async.} =

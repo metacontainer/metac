@@ -14,8 +14,13 @@ proc main*() {.async.} =
       case d.category:
       of "fs:localfile":
         return localFilePersistable(instance, d.description.castAs(string), runtimeId=d.runtimeId).toAnyPointer.just
+      of "fs:localfs":
+        return localFsPersistable(instance, d.description.castAs(string)).toAnyPointer.just
+      of "fs:mount":
+        let params = d.description.castAs(FilesystemNamespace_mount_Params)
+        return rootNamespace.mount(params.path, params.fs).toAnyPointerFuture
       else:
-        return error(AnyPointer, "unknown category"))
+        return error(AnyPointer, "unknown category " & d.category))
 
   await instance.runService(
     service=Service.createFromCap(nothingImplemented),
