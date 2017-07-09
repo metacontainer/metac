@@ -1,16 +1,18 @@
-import metac, metac/schemas, metac/fs_cli, collections, metac/stream
+import metac, metac/schemas, metac/fs_cli, metac/network_cli, collections, metac/stream
 
 proc main*() {.async.} =
   let instance = await newInstance()
   let launcher = await instance.getServiceAdmin("computevm", ComputeLauncher)
   let dir = await fsFromUri(instance, "local:/bin")
+  let myNet = await netFromUri(instance, "newlocal:processnet")
 
   let config = ProcessEnvironmentDescription(
     memory: 512,
     filesystems: @[
       FsMount(path: "/bin", fs: dir)
     ],
-    networks: @[]
+    networks: @[NetworkInterface(l2interface: myNet,
+                                 addresses: @["10.50.0.2/24"])]
   )
 
   let processConfig = ProcessDescription(

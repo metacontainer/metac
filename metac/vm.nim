@@ -34,26 +34,48 @@ proc qemuQuoteName(v: string): string =
       raise newException(ValueError, "invalid name")
   return v
 
-proc stop(self: VMImpl): Future[void] {.async.} =
-  discard
-
-proc serialPort(self: VMImpl, index: int32): Future[Stream] =
-  if index < 0 or index >= self.serialPorts.len:
-    return error(Stream, "VM.serialPort: bad index")
-  return just(self.serialPorts[index.int])
-
-proc network(self: VMImpl, index: int32): Future[L2Interface] =
-  if index < 0 or index >= self.networks.len:
-    return error(L2Interface, "VM.network: bad index")
-  return just(self.networks[index.int])
-
-proc destroy(self: VMImpl): Future[void] {.async.} =
-  return
+proc network(self: VMImpl, index: int32): Future[L2Interface] {.async.}
+proc serialPort(self: VMImpl, index: int32): Future[Stream] {.async.}
+proc stop(self: VMImpl): Future[void] {.async.}
+proc destroy(self: VMImpl): Future[void] {.async.}
 
 capServerImpl(VMImpl, [VM, Persistable])
 
+proc stop(self: VMImpl): Future[void] {.async.} =
+  discard
+
+proc serialPort(self: VMImpl, index: int32): Future[Stream] {.async.} =
+  if index < 0 or index >= self.serialPorts.len:
+    return error(Stream, "VM.serialPort: bad index")
+
+  let sock =
+    injectPersistence(
+      self.serialPorts[index.int],
+      makePersistenceCallDelegate(self.instance, self.asVM, VM_serialPort_Params(index: index)))
+  return sock
+
+proc network(self: VMImpl, index: int32): Future[L2Interface] {.async.} =
+  if index < 0 or index >= self.networks.len:
+    return error(L2Interface, "VM.network: bad index")
+  return self.networks[index.int]
+
+proc destroyVM(self: VMImpl) =
+  echo "VM: destroy"
+  self.process.kill()
+
+proc destroy(self: VMImpl): Future[void] {.async.} =
+  destroyVM(self)
+
 proc launchVM(instance: ServiceInstance, config: LaunchConfiguration, persistenceDelegate: PersistenceDelegate=nil): Future[VM] {.async.} =
-  let vm = VMImpl(instance: instance, cleanupProcs: @[], serialPorts: @[], networks: @[], persistenceDelegate: persistenceDelegate, holders: @[])
+  var vm: VMImpl
+  new(vm, destroyVM)
+  vm.instance = instance
+  vm.cleanupProcs = @[]
+  vm.serialPorts = @[]
+  vm.networks = @[]
+  vm.persistenceDelegate = persistenceDelegate
+  vm.holders = @[]
+
   var cmdline = @["qemu-system-x86_64",
                   "-enable-kvm",
                   "-nographic",
@@ -61,7 +83,6 @@ proc launchVM(instance: ServiceInstance, config: LaunchConfiguration, persistenc
                   #"-sandbox", "on"
   ]
 
-  echo "launch vm: ", config.pprint
   var fds: seq[cint] = @[]
   proc cleanupFds() =
     for fd in fds:
@@ -164,7 +185,9 @@ proc launchVM(instance: ServiceInstance, config: LaunchConfiguration, persistenc
   for i, path in serialPortPaths:
     await waitForFile(path)
     let sock = instance.wrapUnixSocketAsStream(path)
-    vm.serialPorts.add injectPersistence(sock, makePersistenceCallDelegate(instance, vm.asVM, VM_serialPort_Params(index: i.int32)))
+    vm.serialPorts.add sock
+
+  echo "VM refcnt:", getRefcount(vm)
 
   return vm.asVM
 
@@ -186,6 +209,7 @@ proc getLauncher(self: VMServiceImpl): Future[VMLauncher] {.async.} =
   return self.restrictInterfaces(VMLauncher)
 
 proc main*() {.async.} =
+  enableGcNoDelay()
   let instance = await newServiceInstance("vm")
 
   let serviceImpl = VMServiceImpl(instance: instance)

@@ -48,6 +48,10 @@ interface ServiceAdmin {}
 
 interface Holder {}
 
+interface Destroyable {
+  destroy @0 ();
+}
+
 interface ResourceGroup {
   # Resource group is used for accounting and rate limiting.
 

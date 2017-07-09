@@ -1,11 +1,19 @@
-#!/bin/sh
+#!/bin/bash
 # Build computevm agent
 set -e
-if [ ! -e build/vmlinuz ]; then
-    wget https://cdn.atomshare.net/8d99742552a6b2730aaccd15df10ca5b3e5281d5/vmlinuz-4.4.20 -O build/vmlinuz
-fi
 
-nim c --out:build/compute_agent metac/compute_agent.nim
+kernel=$(nix-build metac.nix -A vmKernel)
+musl=$(nix-build '<nixpkgs>' -A musl)
+linuxHeaders=$(nix-build '<nixpkgs>' -A linuxHeaders)
+
+ln -sf $kernel/bzImage build/vmlinuz
+
+nim c -d:musl \
+    --out:build/compute_agent \
+    --passc:"-I$linuxHeaders/include" \
+    --gcc.linkerexe:"$musl/bin/musl-gcc" \
+    --gcc.exe:"$musl/bin/musl-gcc" \
+    metac/compute_agent.nim
 mkdir -p build/initrd/bin
 cp build/compute_agent build/initrd/init
 cp /bin/busybox build/initrd/bin/busybox

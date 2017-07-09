@@ -43,7 +43,14 @@ proc launchProcess(self: ProcessEnvironmentImpl, description: ProcessDescription
 proc network(self: ProcessEnvironmentImpl, index: uint32): Future[L2Interface] {.async.} =
   discard
 
-capServerImpl(ProcessEnvironmentImpl, [ProcessEnvironment])
+proc destroyProcessEnvironment(self: ProcessEnvironmentImpl) =
+  echo "destroy ProcessEnvironmentImpl"
+  self.vm.destroy().ignore
+
+proc destroy(self: ProcessEnvironmentImpl): Future[void] {.async.} =
+  destroyProcessEnvironment(self)
+
+capServerImpl(ProcessEnvironmentImpl, [ProcessEnvironment, Destroyable])
 
 proc randomAgentNetwork(): IpInterface =
   var arr: array[16, uint8]
@@ -60,38 +67,48 @@ proc runAgentServer(env: ProcessEnvironmentImpl): Future[void] {.async.} =
   let conn = await server.incomingConnections.receive
   server.incomingConnections.recvClose(JustClose)
 
+  let initImpl = AgentBootstrapInlineImpl()
+
   proc agentInit(agentEnv: AgentEnv): Future[ProcessEnvironmentDescription] =
-    if env.agentEnv.getFuture.isCompleted: asyncRaise "double init"
+    initImpl.init = nil # unset init method to allow GC to free the environ
     env.agentEnv.complete(agentEnv)
     return just(env.description)
 
-  discard newTwoPartyServer(conn, inlineCap(AgentBootstrap, AgentBootstrapInlineImpl(
-    init: agentInit
-  )).toCapServer)
+  initImpl.init = agentInit
 
-proc proxyStream(self: ProcessEnvironmentImpl, stream: Stream): Stream =
+  discard newTwoPartyServer(conn, inlineCap(AgentBootstrap, initImpl).toCapServer)
+
+proc proxyStream(instance: Instance, myAddress: string, stream: Stream): Stream =
   proc getStream(): Future[BytePipe] =
-    return self.instance.unwrapStreamAsPipe(stream)
+    return instance.unwrapStreamAsPipe(stream)
 
-  let fakeInstance = Instance(address: $self.myAddress)
+  let fakeInstance = Instance(address: myAddress)
   return fakeInstance.wrapStream(getStream)
 
-proc proxyFs(self: ProcessEnvironmentImpl, fs: Filesystem): Filesystem =
+proc proxyFs(instance: Instance, myAddress: string, fs: Filesystem): Filesystem =
   proc v9fsStreamImpl: Future[Stream] {.async.} =
     let stream = await fs.v9fsStream()
-    return proxyStream(self, stream)
+    return proxyStream(instance, myAddress, stream)
 
   return inlineCap(Filesystem, FilesystemInlineImpl(
     v9fsStream: v9fsStreamImpl
   ))
 
+
+proc serialPortHandler(instance: Instance, s: Stream) {.async.} =
+  let port = await instance.unwrapStreamAsPipe(s)
+  asyncFor line in port.input.lines:
+    echo "[vm] ", line.strip(leading=false)
+
 proc launchEnv(self: ComputeVmService, envDescription: ProcessEnvironmentDescription): Future[ProcessEnvironment] {.async.} =
-  let env = ProcessEnvironmentImpl(instance: self.instance)
+  var env: ProcessEnvironmentImpl
+  new(env, destroyProcessEnvironment)
+  env.instance = self.instance
   env.agentEnv = newCompleter[AgentEnv]()
   env.description = envDescription
 
-  let kernel = localFile(self.instance, getCurrentDir() / "build/vmlinuz")
-  let initrd = localFile(self.instance, getCurrentDir() / "build/initrd.cpio")
+  let kernel = localFile(self.instance, expandFilename("build/vmlinuz"))
+  let initrd = localFile(self.instance, expandFilename("build/initrd.cpio"))
   var cmdline = "console=ttyS0 "
 
   let netNamespace = await self.instance.getServiceAdmin("network", NetworkServiceAdmin).rootNamespace
@@ -113,7 +130,11 @@ proc launchEnv(self: ComputeVmService, envDescription: ProcessEnvironmentDescrip
   await execCmd(@["ip", "address", "show", "dev", localDevName])
 
   for mount in envDescription.filesystems:
-    mount.fs = proxyFs(env, mount.fs)
+    mount.fs = proxyFs(env.instance, $env.myAddress, mount.fs)
+
+  for network in envDescription.networks:
+    additionalNetworks.add Network(driver: Network_Driver.virtio, network: network.l2interface)
+    network.l2interface = nullCap
 
   let vmConfig = LaunchConfiguration(
     memory: envDescription.memory,
@@ -138,18 +159,13 @@ proc launchEnv(self: ComputeVmService, envDescription: ProcessEnvironmentDescrip
     drives: @[]
   )
 
-  env.runAgentServer().ignore
+  runAgentServer(env).ignore
 
   let vm = await self.launcher.launch(vmConfig)
   env.vm = vm
 
-  proc serialPortHandler() {.async.} =
-    let portStream = await vm.serialPort(0)
-    let port = await self.instance.unwrapStreamAsPipe(portStream)
-    asyncFor line in port.input.lines:
-      echo "[vm] ", line.strip(leading=false)
-
-  serialPortHandler().ignore
+  let portStream = await vm.serialPort(0)
+  serialPortHandler(env.instance, portStream).ignore
 
   return env.asProcessEnvironment
 
@@ -173,7 +189,7 @@ proc launchProcess(self: ProcessEnvironmentImpl, description: ProcessDescription
     else:
       process.files.add nullCap
 
-    description.files[i].stream = proxyStream(self, description.files[i].stream)
+    description.files[i].stream = proxyStream(self.instance, $self.myAddress, description.files[i].stream)
 
   let agentEnv = await self.agentEnv.getFuture
   let wrappedProcess = await agentEnv.launchProcess(description)
@@ -196,11 +212,12 @@ proc addRule(table: string, rule: string) =
       raise newException(Exception, "can't add iptables rule: " & rule)
 
 proc init() =
-  # TODO: proxy instead of NATting or don't use network device at all (use virtio-serial)
+  # TODO(maybe): don't use network device at all (use virtio-serial)
   discard execShellCmd("ipset create metacvmnat hash:ip")
   addRule("nat", "POSTROUTING -m set --match-set metacvmnat src -j MASQUERADE")
 
 proc main*() {.async.} =
+  enableGcNoDelay()
   init()
   let instance = await newServiceInstance("computevm")
 

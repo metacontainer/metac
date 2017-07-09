@@ -64,6 +64,10 @@ proc connect*(instance: Instance, address: NodeAddress): Future[Node] {.async.} 
 proc `$`*(instance: Instance): string =
   return "Instance@" & instance.address
 
+proc fakeUsage*(a: any) =
+  # forces GC to keep `a` to the point of this call
+  var v {.volatile.} = a
+
 ### ServiceInstance
 
 proc newServiceInstance*(name: string): Future[ServiceInstance] {.async.} =
@@ -79,6 +83,7 @@ proc runService*(sinstance: ServiceInstance, service: Service, adminBootstrap: S
   ## Helper method for registering and running a service
   let holder = await sinstance.instance.thisNodeAdmin.registerNamedService(sinstance.serviceName, service, adminBootstrap)
   await waitForever()
+  fakeUsage holder
 
 converter toInstance*(s: ServiceInstance): Instance =
   return s.instance
@@ -125,6 +130,6 @@ proc waitForFile*(path: string) {.async.} =
   while stat(path.cstring, buf) != 0:
     await asyncSleep(10)
 
-proc fakeUsage*(a: any) =
-  # forces GC to keep `a` to the point of this call
-  var v {.volatile.} = a
+### Adjustments
+
+GC_disableMarkAndSweep() # mark and sweep causes issues with destructors

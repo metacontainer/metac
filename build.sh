@@ -55,11 +55,11 @@ get_dep() {
 
 echo "path: \".\"" > nim.cfg
 
-get_dep capnp https://github.com/zielmicha/capnp.nim e17e7fd31ee4cfe3a2280fc9cd45fe2511658e50 ''
+get_dep capnp https://github.com/zielmicha/capnp.nim 323bff1190b8208c281a1e6344816a9336918ee3 ''
 get_dep cligen https://github.com/c-blake/cligen 493e06338b3fd0b740629823f347b73e5e6853f9 ''
-get_dep collections https://github.com/zielmicha/collections.nim ab4ad35f0cab08e01a16cd54a0c16938a18ba10a ''
+get_dep collections https://github.com/zielmicha/collections.nim 9c4813b67f7a946a62b59d99cb2b4af53f7abb62 ''
 get_dep morelinux https://github.com/zielmicha/morelinux 65edae5c9071ad5afc002611ea8f396fee9de000 ''
-get_dep reactor https://github.com/zielmicha/reactor.nim b3fe3110c8e3392191e2bb2cbab08b03e08d4602 ''
+get_dep reactor https://github.com/zielmicha/reactor.nim 5dff93618c0644255bffee51c67c906788a8836a ''
 
 echo '# reactor.nim requires pthreads
 threads: "on"
@@ -79,7 +79,17 @@ hint[XDeclaredButNotUsed]: "off"
 threadanalysis: "off"
 
 d:caprpcPrintExceptions
-passC: "-fsanitize-trap=null -fsanitize-trap=shift"
+d:caprpcTraceLifetime
+
+d:useRealtimeGC
+
+@if musl:
+  cc: gcc
+  passL: "-static"
+@else:
+  cc: clang
+  passC: "-fsanitize-trap=null -fsanitize-trap=shift"
+@end
 
 @if release:
   gcc.options.always = "-w -fno-strict-overflow"
@@ -93,6 +103,9 @@ passC: "-fsanitize-trap=null -fsanitize-trap=shift"
   obj_checks: on
   field_checks: on
   bound_checks: on
+@else:
+  d:useSysAssert
+  d:useGcAssert
 @end' >> nim.cfg
 
 mkdir -p bin

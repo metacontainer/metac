@@ -33,7 +33,7 @@ proc reserveVxlanPort(): tuple[sock: SocketHandle, port: int] =
 proc createBridge(name: string) {.async.} =
   await execCmd(@["ip", "link", "add", "name", name, "type", "bridge"])
 
-proc setupBridgeFor(self: KernelInterfaceImpl): Future[string] {.async.} =
+proc setupBridgeFor(self: KernelInterfaceImpl, addToExisting: string=nil): Future[string] {.async.} =
   var bridgeName: string
   let linkInfo: Option[NlLink] = getLink(self.name)
 
@@ -49,8 +49,12 @@ proc setupBridgeFor(self: KernelInterfaceImpl): Future[string] {.async.} =
       # this is already a bridge
       bridgeName = self.name
     else:
-      bridgeName = "mcbr" & hexUrandom(5)
-      await createBridge(bridgeName)
+      if addToExisting != nil:
+        bridgeName = addToExisting
+      else:
+        bridgeName = "mcbr" & hexUrandom(5)
+        await createBridge(bridgeName)
+
       await execCmd(@["ip", "link", "set", "dev", self.name, "master", bridgeName])
   else:
     bridgeName = self.name
@@ -87,12 +91,20 @@ proc bindTo(selfL2: L2InterfaceImpl, other: L2Interface): Future[Holder] {.async
     # use veth
     let otherLocalL2 = await self.instance.toLocal(other, L2InterfaceImpl)
     let otherLocal = otherLocalL2.iface
-    let bridge1 = await setupBridgeFor(self)
-    let bridge2 = await setupBridgeFor(otherLocal)
-    let vethName = "mcve" & hexUrandom(5)
-    await execCmd(@["ip", "link", "add", "name", vethName & "l", "type", "veth", "peer", "name", vethName & "r"])
-    await execCmd(@["ip", "link", "set", "dev", vethName & "l", "master", bridge1, "up"])
-    await execCmd(@["ip", "link", "set", "dev", vethName & "r", "master", bridge2, "up"])
+
+    # attempt to avoid creating two bridges
+    let (dev1, dev2) = if self.isReal: (otherLocal, self) else: (self, otherLocal)
+
+    let bridge1 = await setupBridgeFor(dev1)
+    let bridge2 = await setupBridgeFor(dev2, addToExisting=bridge1)
+
+    echo "binding local devices ", dev1.name, " to ", dev2.name, " (bridges: ", bridge1, " ", bridge2, ")"
+
+    if bridge1 != bridge2:
+      let vethName = "mcve" & hexUrandom(5)
+      await execCmd(@["ip", "link", "add", "name", vethName & "l", "type", "veth", "peer", "name", vethName & "r"])
+      await execCmd(@["ip", "link", "set", "dev", vethName & "l", "master", bridge1, "up"])
+      await execCmd(@["ip", "link", "set", "dev", vethName & "r", "master", bridge2, "up"])
   else:
     # use VXLAN
     await self.createVxlan(port.int, otherSide.local, otherSide.srcPort.int, vniNum)
@@ -128,7 +140,7 @@ proc rename(self: KernelInterfaceImpl, newname: string): Future[void] {.async.} 
 proc isHardware(self: KernelInterfaceImpl): Future[bool] {.async.} =
   return self.isReal # TODO: e.g. tunX are not hardware
 
-capServerImpl(KernelInterfaceImpl, [KernelInterface])
+capServerImpl(KernelInterfaceImpl, [KernelInterface, Persistable])
 
 proc l2Interface(self: KernelInterfaceImpl): Future[L2Interface] {.async.} =
   let iface = L2InterfaceImpl(iface: self, instance: self.instance).asL2Interface
@@ -181,6 +193,7 @@ proc init() =
   # This isn't strictly neccessary, because dstport+vni is a ~39-bit secret.
 
 proc main*() {.async.} =
+  enableGcNoDelay()
   init()
 
   let instance = await newServiceInstance("network")
@@ -191,15 +204,16 @@ proc main*() {.async.} =
     rootNamespace: (() => now(just(rootNamespace.asKernelNetworkNamespace)))
   ))
 
-  await instance.registerRestorer(
-    proc(d: CapDescription): Future[AnyPointer] =
-     case d.category:
+  proc restorer(d: CapDescription): Future[AnyPointer] {.async.} =
+    case d.category:
       of "net:localnet":
-        return error(AnyPointer, "unknown category")
+        return rootNamespace.getInterface(d.description.castAs(string)).toAnyPointerFuture
       of "net:newlocalnet":
-        return error(AnyPointer, "unknown category")
+        return rootNamespace.createInterface(d.description.castAs(string)).toAnyPointerFuture
       else:
-        return error(AnyPointer, "unknown category"))
+        asyncRaise "unknown category"
+
+  await instance.registerRestorer(restorer)
 
   await instance.runService(
     service=Service.createFromCap(nothingImplemented),
