@@ -8,7 +8,6 @@ template unwrapStreamBase(instance, stream, connFunc): untyped =
     remote=instance.nodeAddress,
     port=localAddr.port.int32
   )
-  echo info.pprint
   if info.local.ip == nil: raise newException(ValueError, "bad address")
 
   let fd = await connFunc(TcpConnectionData(
@@ -19,11 +18,11 @@ template unwrapStreamBase(instance, stream, connFunc): untyped =
   (fd, info.holder)
 
 proc unwrapStream*(instance: Instance, stream: schemas.Stream): Future[tuple[fd: cint, holder: Holder]] {.async.} =
-  ## Turns (possibly remote) Stream into file descriptor.
+  ## Turns (possibly remote) Stream into a file descriptor.
   return unwrapStreamBase(instance, stream, connectTcpAsFd)
 
 proc unwrapStreamAsPipe*(instance: Instance, stream: schemas.Stream): Future[BytePipe] {.async.} =
-  ## Turn (possibly remote) Stream into local BytePipe.
+  ## Turn (possibly remote) Stream into a local BytePipe.
   let (pipe, holder) = unwrapStreamBase(instance, stream, connectTcp)
 
   type PipeAndHolder = ref object of BytePipe
@@ -39,6 +38,8 @@ proc wrapStream*(instance: Instance, getStream: (proc(): Future[BytePipe])): sch
       if address.address != parseAddress(remote.ip) or address.port != port:
         stderr.writeLine "stream: invalid host attempted connection (host: [$1]:$2, expected: [$3]:$4)" % [
           $address.address, $address.port, $parseAddress(remote.ip), $port]
+        conn.close(JustClose)
+        continue
 
       defer:
         stderr.writeLine "stream: connection finished (", address, ")"
@@ -46,7 +47,7 @@ proc wrapStream*(instance: Instance, getStream: (proc(): Future[BytePipe])): sch
       let streamPipe = await getStream()
       let res = tryAwait pipe(conn.BytePipe, streamPipe)
       if res.isError:
-        stderr.writeLine("stream: piping finished with error", res)
+        stderr.writeLine("stream: piping finished with error ", res)
       else:
         stderr.writeLine("stream: piping finished")
       return

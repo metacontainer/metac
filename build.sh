@@ -59,7 +59,7 @@ get_dep capnp https://github.com/zielmicha/capnp.nim 7600c3520bbd034629253c2c5b9
 get_dep cligen https://github.com/c-blake/cligen 493e06338b3fd0b740629823f347b73e5e6853f9 ''
 get_dep collections https://github.com/zielmicha/collections.nim 9c4813b67f7a946a62b59d99cb2b4af53f7abb62 ''
 get_dep morelinux https://github.com/zielmicha/morelinux 65edae5c9071ad5afc002611ea8f396fee9de000 ''
-get_dep reactor https://github.com/zielmicha/reactor.nim 2c720cc6bc6994d422930a637ac60b769f4f87a5 ''
+get_dep reactor https://github.com/zielmicha/reactor.nim 6a71fe09bf590603631a67551b3e50c7e5b7a802 ''
 
 echo '# reactor.nim requires pthreads
 threads: "on"
@@ -87,13 +87,8 @@ d:caprpcPrintExceptions
 
 d:useRealtimeGC
 
-@if musl:
-  cc: gcc
-  #passL: "-static"
-@else:
-  cc: clang
-  passC: "-fsanitize-trap=null -fsanitize-trap=shift"
-@end
+cc: clang
+passC: "-fsanitize-trap=null -fsanitize-trap=shift"
 
 passC:"-ffunction-sections -fdata-sections -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2"
 passL:"-Wl,--gc-sections -fPIE"

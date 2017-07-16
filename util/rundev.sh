@@ -1,6 +1,9 @@
 #!/bin/bash
 
-addr=fdca:ddf9:5703::1
+addr="$1"
+if [ "$addr" = "" ]; then
+    addr=fdca:ddf9:5703::1
+fi
 METAC_ADDRESS=$addr
 
 sudo mkdir -p /run/metac/$addr
@@ -9,6 +12,7 @@ if [ ! -e /sys/class/net/metac1 ]; then
     sudo ip link add metac1 type bridge
     sudo ip addr add dev metac1 $addr
     sudo ip link set dev metac1 up
+    sleep 1 # wait for DAD
 fi
 
 sudo rundev dev --env PATH=$PATH --env=METAC_ADDRESS=$addr -- sh -c "

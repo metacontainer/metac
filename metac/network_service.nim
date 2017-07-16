@@ -18,8 +18,12 @@ type
 
 capServerImpl(BindToImpl, [Holder])
 
-proc reserveVxlanPort(): tuple[sock: SocketHandle, port: int] =
+const auxLinkAlias = "managed by metac network"
+
+proc reserveVxlanPort(address: string): tuple[sock: SocketHandle, port: int] =
+  assert parseAddress(address).kind == ip6
   let sock = socket(AF_INET6, SOCK_DGRAM, 0).SocketHandle
+
   var address = SockAddr_in6(sin6_family: AF_INET6, sin6_port: 0, sin6_flowinfo: 0, sin6_scope_id: 0, sin6_addr: in6addr_any)
   var addrLen: Socklen = sizeof(address).Socklen
   if bindSocket(sock, cast[ptr SockAddr](addr address), addrLen) != 0:
@@ -64,7 +68,7 @@ proc setupBridgeFor(self: KernelInterfaceImpl, addToExisting: string=nil): Futur
       asyncRaise "'new' link already exists and is not a bridge!"
 
   await execCmd(@["ip", "link", "set", "dev", self.name, "up"])
-  await execCmd(@["ip", "link", "set", "dev", bridgeName, "up"])
+  await execCmd(@["ip", "link", "set", "dev", bridgeName, "alias", auxLinkAlias, "up"])
   return bridgeName
 
 proc createVxlan(self: KernelInterfaceImpl, localPort: int, remote: NodeAddress, remotePort: int, vniNum: int): Future[void] {.async.} =
@@ -73,7 +77,7 @@ proc createVxlan(self: KernelInterfaceImpl, localPort: int, remote: NodeAddress,
   var remote = parseAddress(remote.ip)
 
   await execCmd(@["ip", "link", "add", "name", vxlanName, "type", "vxlan", "id", $vniNum, "remote", $remote, "dstport", $remotePort, "srcport", $localPort, $(localPort+1)])
-  await execCmd(@["ip", "link", "set", "dev", vxlanName, "master", bridgeName])
+  await execCmd(@["ip", "link", "set", "dev", vxlanName, "master", bridgeName, "alias", auxLinkAlias])
   await execCmd(@["ip", "link", "set", "dev", vxlanName, "up"])
 
   await execCmd(@["ipset", "add", "metacvxlan", $localPort])
@@ -82,7 +86,7 @@ proc createVxlan(self: KernelInterfaceImpl, localPort: int, remote: NodeAddress,
 proc bindTo(selfL2: L2InterfaceImpl, other: L2Interface): Future[Holder] {.async.} =
   let self = selfL2.iface
 
-  let (sock, port) = reserveVxlanPort()
+  let (sock, port) = reserveVxlanPort(self.instance.nodeAddress.ip)
   let vniNum = random(1 shl 24)
   # TODO: defer: close(sock)
   let otherSide = await other.setupVxlan(self.instance.nodeAddress, port.uint16, vniNum.uint32)
@@ -103,7 +107,7 @@ proc bindTo(selfL2: L2InterfaceImpl, other: L2Interface): Future[Holder] {.async
     if bridge1 != bridge2:
       let vethName = "mcve" & hexUrandom(5)
       await execCmd(@["ip", "link", "add", "name", vethName & "l", "type", "veth", "peer", "name", vethName & "r"])
-      await execCmd(@["ip", "link", "set", "dev", vethName & "l", "master", bridge1, "up"])
+      await execCmd(@["ip", "link", "set", "dev", vethName & "l", "master", bridge1, "alias", auxLinkAlias, "up"])
       await execCmd(@["ip", "link", "set", "dev", vethName & "r", "master", bridge2, "up"])
   else:
     # use VXLAN
@@ -118,7 +122,7 @@ proc setupVxlan(selfL2: L2InterfaceImpl, remote: NodeAddress, dstPort: uint16, v
   if parseAddress(remote.ip) == parseAddress(self.instance.nodeAddress.ip):
     return L2Interface_setupVxlan_Result(local: self.instance.nodeAddress, srcPort: 0, holder: nullCap)
 
-  let (sock, port) = reserveVxlanPort()
+  let (sock, port) = reserveVxlanPort(self.instance.nodeAddress.ip)
 
   await self.createVxlan(port.int, remote, dstPort.int, vniNum.int)
   return L2Interface_setupVxlan_Result(local: self.instance.nodeAddress, srcPort: port.uint16, holder: nullCap)
@@ -180,6 +184,12 @@ proc addRule(rule: string) =
       raise newException(Exception, "can't add iptables rule: " & rule)
 
 proc init() =
+  # cleanup old liks
+  for link in getLinks():
+    if link.alias == auxLinkAlias:
+      echo "delete old link ", link.name
+      discard execShellCmd("ip link delete " & quoteShell(link.name))
+
   # (hash would be probably a better option)
   discard execShellCmd("ipset create metacvxlan bitmap:port range 1024-65535")
   discard execShellCmd("ipset create metacvxlanips hash:ip,port")

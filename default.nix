@@ -1,1 +1,1 @@
-(import ./metac.nix).metacDebug
+(import ./metac.nix).metacDeb

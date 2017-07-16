@@ -24,7 +24,7 @@ proc fileFromUri*(instance: Instance, uri: string): auto = return fileFromUri(in
 proc fsFromUri*(instance: Instance, uri: string): auto = return fileFromUri(instance, uri, schemas.Filesystem)
 
 defineExporter(fsExportCmd, fsFromUri)
-defineExporter(fileExportCmd, fsFromUri)
+defineExporter(fileExportCmd, fileFromUri)
 
 proc catCmd(uri: string) =
   if uri == nil:
