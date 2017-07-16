@@ -100,6 +100,9 @@ proc serialPortHandler(instance: Instance, s: Stream) {.async.} =
   asyncFor line in port.input.lines:
     echo "[vm] ", line.strip(leading=false)
 
+const kernelPath {.strdefine.} = "vmlinuz"
+const initrdPath {.strdefine.} = "initrd.cpio"
+
 proc launchEnv(self: ComputeVmService, envDescription: ProcessEnvironmentDescription): Future[ProcessEnvironment] {.async.} =
   var env: ProcessEnvironmentImpl
   new(env, destroyProcessEnvironment)
@@ -107,8 +110,8 @@ proc launchEnv(self: ComputeVmService, envDescription: ProcessEnvironmentDescrip
   env.agentEnv = newCompleter[AgentEnv]()
   env.description = envDescription
 
-  let kernel = localFile(self.instance, expandFilename("build/vmlinuz"))
-  let initrd = localFile(self.instance, expandFilename("build/initrd.cpio"))
+  let kernel = localFile(self.instance, expandFilename(getAppDir() / kernelPath))
+  let initrd = localFile(self.instance, expandFilename(getAppDir() / initrdPath))
   var cmdline = "console=ttyS0 "
 
   let netNamespace = await self.instance.getServiceAdmin("network", NetworkServiceAdmin).rootNamespace
@@ -204,23 +207,11 @@ proc launch(self: ComputeVmService, processDescription: ProcessDescription,
 
 capServerImpl(ComputeVmService, [ComputeLauncher])
 
-
-proc addRule(table: string, rule: string) =
-  if execShellCmd("ip6tables -t $1 -C $2 2>/dev/null" % [table, rule]) != 0:
-    let ok = execShellCmd("iptables -t $1 -A $2"  % [table, rule])
-    if ok != 0:
-      raise newException(Exception, "can't add iptables rule: " & rule)
-
-proc init() =
-  # TODO(maybe): don't use network device at all (use virtio-serial)
-  discard execShellCmd("ipset create metacvmnat hash:ip")
-  addRule("nat", "POSTROUTING -m set --match-set metacvmnat src -j MASQUERADE")
-
 proc main*() {.async.} =
   enableGcNoDelay()
-  init()
   let instance = await newServiceInstance("computevm")
 
+  await instance.waitForService("vm")
   let vmLauncher = await instance.getServiceAdmin("vm", VMServiceAdmin).getLauncher
   let serviceImpl = ComputeVmService(instance: instance, launcher: vmLauncher)
   let serviceAdmin = serviceImpl.asComputeLauncher

@@ -48,6 +48,12 @@ interface ServiceAdmin {}
 
 interface Holder {}
 
+interface Waitable {
+  wait @0 ();
+  # Wait until the held object is destroyed.
+  # In case of failure (e.g. host responsible for this cap is rebooted) error should be returned.
+}
+
 interface Destroyable {
   destroy @0 ();
 }
@@ -74,6 +80,9 @@ interface Node {
 
   getService @1 (id :ServiceId) -> (service :Service);
   # Returns a service object for a given service id.
+
+  waitForService @3 (id :ServiceId);
+  # Wait for service to become available.
 
   registerAnonymousService @2 (service :Service) -> (id :ServiceId, holder :Holder);
   # Registers an anonymous service.

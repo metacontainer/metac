@@ -1,4 +1,4 @@
-import metac/schemas, caprpc, posix, reactor, reactor/unix, os, tables, collections
+import metac/schemas, caprpc, posix, reactor, reactor/unix, os, tables, collections, metac/process_util
 
 type
   Instance* = ref object
@@ -43,10 +43,13 @@ proc newInstance*(address: string): Future[Instance] {.async.} =
   return self
 
 proc newInstance*(): Future[Instance] =
-  for entry in walkDir("/run/metac", relative=true):
-    return newInstance(entry.path)
+  if not existsEnv("METAC_ADDRESS"):
+    for entry in walkDir("/run/metac", relative=true):
+      return newInstance(entry.path)
+  else:
+     return newInstance(getEnv("METAC_ADDRESS"))
 
-  raise newException(Exception, "no instance in /run/metac, please run metac-bridge")
+  raise newException(Exception, "no instance in /run/metac, please run 'metac bridge'")
 
 proc nodeAddress*(instance: Instance): NodeAddress =
   return NodeAddress(ip: instance.address)
@@ -54,6 +57,9 @@ proc nodeAddress*(instance: Instance): NodeAddress =
 proc getServiceAdmin*[T](instance: Instance, name: string, typ: typedesc[T]): Future[T] {.async.} =
   let service = await instance.thisNodeAdmin.getServiceAdmin(name)
   return service.castAs(T)
+
+proc waitForService*(instance: Instance, name: string): Future[void] {.async.} =
+  await instance.thisNode.waitForService(ServiceId(kind: ServiceIdKind.named, named: name))
 
 proc connect*(instance: Instance, address: NodeAddress): Future[Node] {.async.} =
   # TODO: multiparty RpcSystem
@@ -72,6 +78,9 @@ proc fakeUsage*(a: any) =
 
 proc newServiceInstance*(name: string): Future[ServiceInstance] {.async.} =
   let instance = await newInstance()
+  if name != "persistence":
+    await instance.waitForService("persistence")
+
   let persistenceHandler = if name != "persistence":
                              await instance.getServiceAdmin("persistence", PersistenceServiceAdmin).getHandlerFor(ServiceId(kind: ServiceIdKind.named, named: name))
                            else:
@@ -82,7 +91,9 @@ proc newServiceInstance*(name: string): Future[ServiceInstance] {.async.} =
 proc runService*(sinstance: ServiceInstance, service: Service, adminBootstrap: ServiceAdmin) {.async.} =
   ## Helper method for registering and running a service
   let holder = await sinstance.instance.thisNodeAdmin.registerNamedService(sinstance.serviceName, service, adminBootstrap)
-  await waitForever()
+  await systemdNotifyReady()
+  stderr.writeLine(sinstance.serviceName & ": ready")
+  await holder.castAs(Waitable).wait
   fakeUsage holder
 
 converter toInstance*(s: ServiceInstance): Instance =

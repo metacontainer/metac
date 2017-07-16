@@ -1,4 +1,4 @@
-import tables, reactor, capnp, caprpc, strutils, metac/schemas, metac/instance, collections, db_sqlite, metac/persistence
+import tables, reactor, capnp, caprpc, strutils, metac/schemas, metac/instance, collections, db_sqlite, metac/persistence, os
 
 type
   PersistenceServiceImpl = ref object of RootObj
@@ -126,9 +126,14 @@ proc restore(self: PersistenceServiceImpl, objectInfo: AnyPointer): Future[AnyPo
 capServerImpl(PersistenceServiceImpl, [PersistenceServiceAdmin, Service, ServiceAdmin])
 
 proc initService(instance: ServiceInstance): PersistenceServiceImpl =
+  let path = if existsEnv("METAC_PERSISTENCE_DB"):
+               getEnv("METAC_PERSISTENCE_DB")
+             else:
+               "/var/lib/metac/persistence.db"
+  createDir(splitPath(path).head)
   let self = PersistenceServiceImpl(handlers: newTable[string, ServicePersistenceHandlerImpl](),
                                     instance: instance,
-                                    dbConn: db_sqlite.open("persistence.db", nil, nil, nil))
+                                    dbConn: db_sqlite.open(path, nil, nil, nil))
   self.dbConn.exec(sql"create table if not exists refs (service text, sturdyRef blob, runtimeId text, primary key (service, sturdyRef));")
   self.dbConn.exec(sql"create table if not exists caps (service text, runtimeId text, category text, description blob, primary key (service, runtimeId));")
 

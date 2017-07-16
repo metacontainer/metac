@@ -55,11 +55,11 @@ get_dep() {
 
 echo "path: \".\"" > nim.cfg
 
-get_dep capnp https://github.com/zielmicha/capnp.nim 323bff1190b8208c281a1e6344816a9336918ee3 ''
+get_dep capnp https://github.com/zielmicha/capnp.nim 7600c3520bbd034629253c2c5b9225049bab9c80 ''
 get_dep cligen https://github.com/c-blake/cligen 493e06338b3fd0b740629823f347b73e5e6853f9 ''
 get_dep collections https://github.com/zielmicha/collections.nim 9c4813b67f7a946a62b59d99cb2b4af53f7abb62 ''
 get_dep morelinux https://github.com/zielmicha/morelinux 65edae5c9071ad5afc002611ea8f396fee9de000 ''
-get_dep reactor https://github.com/zielmicha/reactor.nim 5dff93618c0644255bffee51c67c906788a8836a ''
+get_dep reactor https://github.com/zielmicha/reactor.nim 2c720cc6bc6994d422930a637ac60b769f4f87a5 ''
 
 echo '# reactor.nim requires pthreads
 threads: "on"
@@ -78,18 +78,25 @@ hint[XDeclaredButNotUsed]: "off"
 
 threadanalysis: "off"
 
+@if withSqlite:
+  passL: "-lsqlite3"
+  dynlibOverride: "sqlite3"
+@end
+
 d:caprpcPrintExceptions
-d:caprpcTraceLifetime
 
 d:useRealtimeGC
 
 @if musl:
   cc: gcc
-  passL: "-static"
+  #passL: "-static"
 @else:
   cc: clang
   passC: "-fsanitize-trap=null -fsanitize-trap=shift"
 @end
+
+passC:"-ffunction-sections -fdata-sections -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2"
+passL:"-Wl,--gc-sections -fPIE"
 
 @if release:
   gcc.options.always = "-w -fno-strict-overflow"
@@ -97,8 +104,8 @@ d:useRealtimeGC
   clang.options.always = "-w -fno-strict-overflow"
   clang.cpp.options.always = "-w -fno-strict-overflow"
 
-  passC:"-ffunction-sections -fdata-sections -flto -fPIE -fstack-protector-strong -D_FORTIFY_SOURCE=2"
-  passL:"-Wl,--gc-sections -flto -fPIE"
+  passC: "-flto"
+  passL: "-flto"
 
   obj_checks: on
   field_checks: on
@@ -106,6 +113,7 @@ d:useRealtimeGC
 @else:
   d:useSysAssert
   d:useGcAssert
+  d:caprpcTraceLifetime
 @end' >> nim.cfg
 
 mkdir -p bin

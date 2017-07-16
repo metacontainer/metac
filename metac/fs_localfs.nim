@@ -27,7 +27,7 @@ proc getFile(fs: LocalFilesystem, path: string): Future[schemas.File] {.async.} 
   return localFile(fs.instance, safeJoin(fs.path, path),
                    makePersistenceCallDelegate(fs.instance, fs.asFilesystem, Filesystem_getFile_Params(name: path)))
 
-const diodPath {.strdefine.} = "build/diod-server"
+const diodPath {.strdefine.} = "metac-diod"
 
 proc v9fsStream(fs: LocalFilesystem): Future[Stream] {.async.} =
   # TODO: run diod directly on the TCP connection
@@ -36,7 +36,7 @@ proc v9fsStream(fs: LocalFilesystem): Future[Stream] {.async.} =
   let dirFd = await openAt(fs.path)
   defer: discard close(dirFd)
 
-  let process = startProcess(@[diodPath, "--foreground", "--no-auth", "--logdest", "stderr", "--rfdno", "4", "--wfdno", "4", "--export", "/", "-c", "/dev/null", "--chroot-to", "3", "--no-userdb"],
+  let process = startProcess(@[getAppDir() / diodPath, "--foreground", "--no-auth", "--logdest", "stderr", "--rfdno", "4", "--wfdno", "4", "--export", "/", "-c", "/dev/null", "--chroot-to", "3", "--no-userdb"],
                              pipeFiles = [4.cint],
                              additionalFiles = [(3.cint, dirFd.cint),
                                                 (0.cint, 2.cint), (1.cint, 2.cint), (2.cint, 2.cint)])

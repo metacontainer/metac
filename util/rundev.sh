@@ -1,6 +1,7 @@
 #!/bin/bash
 
 addr=fdca:ddf9:5703::1
+METAC_ADDRESS=$addr
 
 sudo mkdir -p /run/metac/$addr
 
@@ -10,15 +11,13 @@ if [ ! -e /sys/class/net/metac1 ]; then
     sudo ip link set dev metac1 up
 fi
 
-sudo rundev dev -- sh -c "
-rundev add bridge -- ./build/metac-bridge $addr
+sudo rundev dev --env PATH=$PATH --env=METAC_ADDRESS=$addr -- sh -c "
+rundev add bridge -- metac bridge
 sleep 0.1
-rundev add persistence-service -- ./build/metac persistence-service
-sleep 1
-rundev add fs-service -- ./build/metac fs-service
-rundev add vm-service -- ./build/metac vm-service
-rundev add network-service -- ./build/metac network-service
-rundev add sound-service -- ./build/metac sound-service
-sleep 1
-rundev add computevm-service -- ./build/metac computevm-service
+rundev add persistence-service -- metac persistence-service
+rundev add fs-service -- metac fs-service
+rundev add vm-service -- metac vm-service
+rundev add network-service -- metac network-service
+rundev add sound-service -- metac sound-service
+rundev add computevm-service -- metac computevm-service
 "

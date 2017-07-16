@@ -1,0 +1,12 @@
+[Unit]
+Description=MetaContainer bridge
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/metac bridge
+Type=notify
+Restart=on-failure
+EnvironmentFile=/etc/default/metac
+
+[Install]
+WantedBy=metac.target

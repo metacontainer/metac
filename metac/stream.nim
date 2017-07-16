@@ -44,8 +44,11 @@ proc wrapStream*(instance: Instance, getStream: (proc(): Future[BytePipe])): sch
         stderr.writeLine "stream: connection finished (", address, ")"
       server.incomingConnections.recvClose(JustClose)
       let streamPipe = await getStream()
-      await pipe(conn.BytePipe, streamPipe)
-      echo "stream: piping finished"
+      let res = tryAwait pipe(conn.BytePipe, streamPipe)
+      if res.isError:
+        stderr.writeLine("stream: piping finished with error", res)
+      else:
+        stderr.writeLine("stream: piping finished")
       return
 
   proc tcpListenImpl(remote: schemas.NodeAddress, port: int32): Future[Stream_tcpListen_Result] {.async.} =

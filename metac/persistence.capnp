@@ -14,12 +14,6 @@ interface Persistable {
   # Create unguessable reference to this object and return it.
 }
 
-interface Waitable {
-  wait @0 ();
-  # Wait until the held object is destroyed.
-  # In case of failure (e.g. host responsible for this cap is rebooted) error should be returned.
-}
-
 # For service authors.
 
 struct CapDescription {

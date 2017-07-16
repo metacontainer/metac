@@ -1,8 +1,8 @@
 ## Implements the multicall binary (all programs in one binary).
 import os, strutils, reactor, collections
 import metac/cli_common
-import metac/vm, metac/fs, metac/persistence_service, metac/computevm_service, metac/network_service, metac/sound_service
-import metac/fs_cli, metac/stream_cli, metac/network_cli, metac/sound_cli
+import metac/vm, metac/fs, metac/persistence_service, metac/computevm_service, metac/network_service, metac/sound_service, metac/bridge
+import metac/fs_cli, metac/stream_cli, metac/network_cli, metac/sound_cli, metac/persistence_cli
 import tests/vm_test, tests/compute_test
 
 dispatchSubcommand({
@@ -12,6 +12,9 @@ dispatchSubcommand({
   "stream": (() => stream_cli.main()),
   "network": (() => network_cli.main()),
   "sound": (() => sound_cli.main()),
+  "ref": (() => persistence_cli.main()),
+
+  "bridge": (() => bridge.main().runMain()),
 
   "vm-service": (() => vm.main().runMain),
   "fs-service": (() => fs.main().runMain),

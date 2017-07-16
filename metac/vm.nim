@@ -84,11 +84,10 @@ proc launchVM(instance: ServiceInstance, config: LaunchConfiguration, persistenc
   ]
 
   var fds: seq[cint] = @[]
-  proc cleanupFds() =
+
+  defer:
     for fd in fds:
       discard close(fd)
-
-  defer: cleanupFds()
 
   if config.boot.kind == LaunchConfiguration_BootKind.disk:
     if config.boot.disk != 0:
@@ -96,13 +95,20 @@ proc launchVM(instance: ServiceInstance, config: LaunchConfiguration, persistenc
     cmdline &= ["-boot", "c"]
   elif config.boot.kind == LaunchConfiguration_BootKind.kernel and config.boot.kernel != nil:
     let bootOpt = config.boot.kernel
-    let kernelFile = await copyToTempFile(instance, bootOpt.kernel)
 
+    proc copyToTemp(f: schemas.File): Future[string] {.async.} =
+      var path = await copyToTempFile(instance, f)
+      let fd = posix.open(path, O_RDONLY)
+      fds.add fd
+      removeFile path
+      return "/proc/self/fd/" & $fd
+
+    let kernelFile = await copyToTemp(bootOpt.kernel)
     cmdline &= [
       "-kernel", kernelFile,
       "-append", bootOpt.cmdline]
     if not bootOpt.initrd.toCapServer.isNullCap:
-      let initrdFile = await copyToTempFile(instance, bootOpt.initrd)
+      let initrdFile = await copyToTemp(bootOpt.initrd)
       cmdline &= ["-initrd", initrdFile]
   else:
     asyncRaise("unsupported boot method")
