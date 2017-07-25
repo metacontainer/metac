@@ -39,7 +39,7 @@ proc serialPort(self: VMImpl, index: int32): Future[Stream] {.async.}
 proc stop(self: VMImpl): Future[void] {.async.}
 proc destroy(self: VMImpl): Future[void] {.async.}
 
-capServerImpl(VMImpl, [VM, Persistable])
+capServerImpl(VMImpl, [VM, Persistable, Waitable])
 
 proc stop(self: VMImpl): Future[void] {.async.} =
   discard

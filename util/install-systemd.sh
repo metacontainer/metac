@@ -19,6 +19,7 @@ for name in $pkgs; do
 [Unit]
 Description=MetaContainer $name service
 After=metac-bridge.service
+PartOf=metac.target
 
 [Service]
 ExecStart=/usr/bin/metac $name-service

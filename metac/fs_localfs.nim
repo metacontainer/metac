@@ -9,7 +9,7 @@ proc getSubtree(fs: LocalFilesystem, path: string): Future[Filesystem] {.async.}
 proc v9fsStream(fs: LocalFilesystem): Future[Stream] {.async.}
 proc getFile(fs: LocalFilesystem, path: string): Future[schemas.File] {.async.}
 
-capServerImpl(LocalFilesystem, [Filesystem, Persistable])
+capServerImpl(LocalFilesystem, [Filesystem, Persistable, Waitable])
 
 proc localFs*(instance: ServiceInstance, path: string, persistenceDelegate: PersistenceDelegate=nil): schemas.Filesystem =
   ## Return Filesystem cap for local filesystem on path ``path``.

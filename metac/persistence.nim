@@ -12,6 +12,10 @@ proc createSturdyRef*[T: PersistableObj](self: T, rgroup: ResourceGroup, persist
 
   return self.persistenceDelegate(self.toCapServer, rgroup, persistent)
 
+proc wait*[T: PersistableObj](self: T): Future[void] =
+  ## Default wait the never returns. (The method will appear to return on receiver side when the connection is broken)
+  return waitForever()
+
 proc makePersistenceDelegate*(instance: ServiceInstance, category: string, description: AnyPointer, runtimeId: string=nil): PersistenceDelegate =
   let runtimeId = if runtimeId == nil: hexUrandom(32) else: runtimeId
 
@@ -53,12 +57,15 @@ proc restore*(instance: Instance, m: MetacSturdyRef): Future[AnyPointer] =
   return instance.connect(m.node).getService(m.service).restore(m.objectInfo)
 
 proc formatSturdyRef*(m: MetacSturdyRef): string =
-  if "/" in m.service.named:
+  if not validIdentifier(m.service.named):
     raise newException(Exception, "invalid service name")
 
   discard parseAddress(m.node.ip)
 
-  return "ref://[" & m.node.ip & "]/" & m.service.named & "/" & urlsafeBase64Encode(packPointer(m.objectInfo).compressCapnp)
+  let name = if m.service.named == "persistence": "-"
+             else: m.service.named
+
+  return "ref://[" & m.node.ip & "]/" & name & "/" & urlsafeBase64Encode(packPointer(m.objectInfo).compressCapnp)
 
 proc parseSturdyRef*(s: string): MetacSturdyRef =
   if not s.startswith("ref://"):
@@ -66,7 +73,10 @@ proc parseSturdyRef*(s: string): MetacSturdyRef =
 
   let spl = s.split('/')
   let ip = spl[2].strip(trailing=false, chars={'['}).strip(leading=false, chars={']'})
-  let serviceName = spl[3]
+  let serviceName = if spl[3] == "-": "persistence"
+                    else: spl[3]
+  if not validIdentifier(serviceName):
+    raise newException(ValueError, "invalid service name")
   let objectInfo = newUnpackerFlat(urlsafeBase64Decode(spl[4]).decompressCapnp).unpackPointer(0, AnyPointer)
 
   return MetacSturdyRef(node: NodeAddress(ip: ip),

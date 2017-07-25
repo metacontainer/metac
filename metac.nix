@@ -17,7 +17,7 @@ rec {
   diod = stdenv.mkDerivation rec {
     name = "diod";
     env = buildEnv { name = name; paths = []; };
-    buildInputs = [clang];
+    buildInputs = [clang stdenv.glibc.static];
     src = ./third-party/diod;
     buildPhase = ''clang ${clangMuslCFlags} -static -O2 -flto -fPIE -fstack-protector-strong -DHAVE_GETOPT_H -DHAVE_GETOPT_LONG -D_FORTIFY_SOURCE=2 -DMETA_ALIAS='"diod-metac"' -D_GNU_SOURCE -I libnpclient -I libnpfs -I liblsd -I libdiod -DX_LOCALSTATEDIR='""' -Wall diod/diod.c diod/exp.c diod/fid.c diod/ioctx.c diod/ops.c diod/xattr.c libnpclient/chmod.c libnpclient/fid.c libnpclient/fsys.c libnpclient/mkdir.c libnpclient/mount.c libnpclient/mtfsys.c libnpclient/open.c libnpclient/pool.c libnpclient/read.c libnpclient/readdir.c libnpclient/remove.c libnpclient/stat.c libnpclient/walk.c libnpclient/write.c libnpclient/xattr.c liblsd/error.c liblsd/hash.c liblsd/hostlist.c liblsd/list.c liblsd/thread.c libnpfs/conn.c libnpfs/ctl.c libnpfs/error.c libnpfs/fcall.c libnpfs/fdtrans.c libnpfs/fidpool.c libnpfs/fmt.c libnpfs/np.c libnpfs/npstring.c libnpfs/srv.c libnpfs/trans.c libnpfs/user.c libdiod/diod_auth.c libdiod/diod_conf.c libdiod/diod_log.c libdiod/diod_sock.c -pthread -o diod-server ${clangMuslLdFlags} '';
     installPhase = ''mkdir -p $out/bin; cp diod-server $out/bin'';
@@ -57,6 +57,7 @@ cp bin/nim $out
 
   nimBootstrap = lastNim: stdenv.mkDerivation rec {
     name = "nim";
+    buildInputs = [clang];
     srcs = fetchurl {
       url = "https://github.com/nim-lang/nim/archive/8c0e27e.tar.gz";
       sha256 = "0ib7zn0a9jmgig3f903knyba2gj5sakr41srsq7k9dsljyh4g2zq";
@@ -77,8 +78,11 @@ mv $out/nim/*     $out/     && rmdir $out/nim
 
   nim = nimBootstrap nimCsources;
 
-  clangMuslCFlags = "-nostdinc -isystem ${musl}/include";
-  clangMuslLdFlags = "-nostdlib -L${musl}/lib ${musl}/lib/crt1.o ${musl}/lib/crti.o ${musl}/lib/crtn.o -lc -lm -static";
+  #clangMuslCFlags = "-nostdinc -isystem ${musl}/include";
+  #clangMuslLdFlags = "-nostdlib -L${musl}/lib ${musl}/lib/crt1.o ${musl}/lib/crti.o ${musl}/lib/crtn.o -lc -lm -static";
+  # musl crashes diod, compile with glibc for now
+  clangMuslCFlags = "-DSTATIC_GLIBC";
+  clangMuslLdFlags = "-static -lm";
   clangMuslNim = ''--passl:"${clangMuslLdFlags}" --passc:"${clangMuslCFlags}"'';
 
   nimArgs = {deps, args}: "${clangMuslNim} --path:${deps.reactor} --path:${deps.collections} --path:${deps.capnp} --path:${deps.collections} --path:${deps.cligen} --path:${deps.morelinux} --path:. --nimcache:nix_nimcache ${args}";
@@ -93,11 +97,12 @@ awk '/\[nim\]/,EOF' < ${./nimenv.cfg} | tail -n +2 > nim.cfg
 
   vmAgent = options: stdenv.mkDerivation rec {
     name = "vm-agent";
-    buildInputs = [nim gawk clang_4];
+    buildInputs = [nim gawk clang_4 stdenv.glibc.static];
     buildPhase = ''
 cp -r ${./metac} metac
 touch metac.nimble
 ${setupNimProject options}
+echo ${nimArgs options}
 nim c ${nimArgs options} --passl:"-static" --out:$out metac/compute_agent.nim
 '';
     phases = ["buildPhase"];
@@ -143,7 +148,7 @@ done
   metac = options: stdenv.mkDerivation rec {
     name = "metac";
     version = "0.0.1";
-    buildInputs = [nim gawk clang_4 sqliteMusl];
+    buildInputs = [nim gawk clang_4 sqliteMusl stdenv.glibc.static]; # sqliteMusl
     buildPhase = ''
 cp -r ${./metac} metac
 cp -r ${./tests} tests

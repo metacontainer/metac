@@ -1,9 +1,20 @@
 import strutils, posix, os, reactor/syscall, reactor/async, reactor/threading
 
+proc checkValidPath(path: string) =
+  if path.len >= 1024:
+    raise newException(Exception, "path too long")
+
+  for ch in path:
+    if ch == '\0':
+      raise newException(Exception, "path cannot contain null bytes")
+
 proc safeJoin*(base: string, child: string): string =
   # Safely join `base` and `child` paths - it guarantees that the resulting
   # path will be inside `base`.
   # Here we asume that the filesystem is sane (e.g. probably not Mac OSX)
+  checkValidPath(base)
+  checkValidPath(child)
+
   if child.split('/').len + base.split('/').len > 40:
     raise newException(ValueError, "path too long")
 
@@ -23,6 +34,7 @@ const
 proc openat(dirfd: cint, pathname: cstring, flags: cint): cint {.importc, header: "<fcntl.h>".}
 
 proc openAtSync(path: string, finalFlags: cint): cint =
+  checkValidPath(path)
   var parts = path[1..^1].split('/')
   var fd: cint = retrySyscall(open("/", O_DIRECTORY or O_NOFOLLOW, 0o400))
   defer: discard close(fd)

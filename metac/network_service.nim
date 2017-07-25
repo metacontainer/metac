@@ -144,7 +144,7 @@ proc rename(self: KernelInterfaceImpl, newname: string): Future[void] {.async.} 
 proc isHardware(self: KernelInterfaceImpl): Future[bool] {.async.} =
   return self.isReal # TODO: e.g. tunX are not hardware
 
-capServerImpl(KernelInterfaceImpl, [KernelInterface, Persistable])
+capServerImpl(KernelInterfaceImpl, [KernelInterface, Persistable, Waitable])
 
 proc l2Interface(self: KernelInterfaceImpl): Future[L2Interface] {.async.} =
   let iface = L2InterfaceImpl(iface: self, instance: self.instance).asL2Interface

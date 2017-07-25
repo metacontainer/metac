@@ -35,7 +35,7 @@ proc nbdSetup(self: LocalFile): Future[schemas.Stream] {.async.} =
 
 proc openAsBlock(self: LocalFile): Future[schemas.BlockDevice] {.async.}
 
-capServerImpl(LocalFile, [schemas.File, BlockDevice, Persistable])
+capServerImpl(LocalFile, [schemas.File, BlockDevice, Persistable, Waitable])
 
 proc openAsBlock(self: LocalFile): Future[schemas.BlockDevice] {.async.} =
   return self.asBlockDevice

@@ -9,7 +9,7 @@ interface PersistenceService extends (Metac.Service) {
 
 }
 
-interface Persistable {
+interface Persistable extends (Metac.Waitable) {
   createSturdyRef @0 (rgroup :Metac.ResourceGroup, persistent :Bool) -> (id :Metac.MetacSturdyRef);
   # Create unguessable reference to this object and return it.
 }

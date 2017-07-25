@@ -102,8 +102,9 @@ mount -t devpts pts /dev/pts
   for fs in envDescription.filesystems:
     echo fs.path, "..."
     createDir("/mnt/" & fs.path)
-    let holder = await mount(env.instance, "/mnt/" & fs.path, fs.fs)
+    let (holder, onFinish) = await mount(env.instance, "/mnt/" & fs.path, fs.fs)
     holders.add holder
+    # TODO(?): remount
 
   execCmd("""
 mkdir -p /mnt/proc /mnt/sys /mnt/dev
