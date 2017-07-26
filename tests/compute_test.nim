@@ -17,7 +17,7 @@ proc main*() {.async.} =
 
   let processConfig = ProcessDescription(
     args: @["/bin/busybox", "sh", "-c", "echo hello hello hello hello; ls /bin; cat /proc/mounts"],
-    files: @[FD(), FD()]
+    files: @[FD(targets: @[uint32(0)]), FD(targets: @[uint32(1)])]
   )
 
   let r = await launcher.launch(processConfig, config)

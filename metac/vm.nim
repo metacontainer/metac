@@ -183,7 +183,7 @@ proc launchVM(instance: ServiceInstance, config: LaunchConfiguration, persistenc
 
   var additionalFiles = @[(1.cint, 1.cint), (2.cint, 2.cint)]
   for fd in fds:
-    setBlocking(fd.FileFd)
+    setBlocking(fd)
     additionalFiles.add((fd, fd))
 
   vm.process = startProcess(cmdline, additionalFiles= additionalFiles)

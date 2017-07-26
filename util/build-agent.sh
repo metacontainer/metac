@@ -9,11 +9,14 @@ linuxHeaders=$(nix-build '<nixpkgs>' -A linuxHeaders)
 ln -sf $kernel/bzImage build/vmlinuz
 
 nim c -d:musl \
+    --nimcache:nimcache \
     --out:build/compute_agent \
     --passc:"-I$linuxHeaders/include" \
+    --passl:"-static" \
     --gcc.linkerexe:"$musl/bin/musl-gcc" \
     --gcc.exe:"$musl/bin/musl-gcc" \
     metac/compute_agent.nim
+
 mkdir -p build/initrd/bin
 cp build/compute_agent build/initrd/init
 cp /bin/busybox build/initrd/bin/busybox

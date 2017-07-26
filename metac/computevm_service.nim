@@ -28,13 +28,13 @@ proc file(self: ProcessImpl, index: uint32): Future[Stream] {.async.} =
   return self.files[index]
 
 proc kill(self: ProcessImpl, signal: uint32): Future[void] {.async.} =
-  return
+  await self.wrapped.kill(signal)
 
 proc returnCode(self: ProcessImpl, ): Future[int32] {.async.} =
-  return 0
+  return self.wrapped.returnCode
 
 proc wait(self: ProcessImpl, ): Future[void] {.async.} =
-  return
+  await self.wrapped.wait
 
 capServerImpl(ProcessImpl, [Process])
 

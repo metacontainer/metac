@@ -55,11 +55,11 @@ get_dep() {
 
 echo "path: \".\"" > nim.cfg
 
-get_dep capnp https://github.com/zielmicha/capnp.nim 7600c3520bbd034629253c2c5b9225049bab9c80 ''
+get_dep capnp https://github.com/zielmicha/capnp.nim 32a6ab5639bdd93ce091f1395d2e333e87d64396 ''
 get_dep cligen https://github.com/c-blake/cligen 493e06338b3fd0b740629823f347b73e5e6853f9 ''
-get_dep collections https://github.com/zielmicha/collections.nim 9c4813b67f7a946a62b59d99cb2b4af53f7abb62 ''
+get_dep collections https://github.com/zielmicha/collections.nim 97b301fee58048102462d9826416fffa66b31dd9 ''
 get_dep morelinux https://github.com/zielmicha/morelinux 65edae5c9071ad5afc002611ea8f396fee9de000 ''
-get_dep reactor https://github.com/zielmicha/reactor.nim 6a71fe09bf590603631a67551b3e50c7e5b7a802 ''
+get_dep reactor https://github.com/zielmicha/reactor.nim 18eb80895f69649132186c0f8a26c8a2c8ef1445 ''
 
 echo '# reactor.nim requires pthreads
 threads: "on"
@@ -108,7 +108,8 @@ passL:"-Wl,--gc-sections -fPIE"
 @else:
   d:useSysAssert
   d:useGcAssert
-  d:caprpcTraceLifetime
+  #d:caprpcTraceLifetime
+  #d:metacTraceStreams
 @end' >> nim.cfg
 
 mkdir -p bin

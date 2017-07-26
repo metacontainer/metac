@@ -1,4 +1,4 @@
-import reactor, reactor/unix, caprpc, metac/instance, metac/schemas, collections, os, reactor/unix, posix
+import reactor, reactor/unix, caprpc, metac/instance, metac/schemas, collections, os, reactor/unix, posix, reactor/file
 
 template unwrapStreamBase(instance, stream, connFunc): untyped =
   let boundSocket = await bindSocketForConnect(parseAddress(instance.address), 0)
@@ -30,26 +30,30 @@ proc unwrapStreamAsPipe*(instance: Instance, stream: schemas.Stream): Future[Byt
 
   return PipeAndHolder(input: pipe.input, output: pipe.output, holder: holder)
 
+proc streamTrace(args: varargs[string, `$`]) =
+  when defined(metacTraceStreams):
+    stderr.writeLine args
+
 proc wrapStream*(instance: Instance, getStream: (proc(): Future[BytePipe])): schemas.Stream =
   proc acceptConnections(remote: schemas.NodeAddress, port: int32, server: TcpServer): Future[void] {.async.} =
     asyncFor conn in server.incomingConnections:
       let address = conn.getPeerAddr
-      stderr.writeLine "stream: connection from ", address
+      streamTrace "stream: connection from ", address
       if address.address != parseAddress(remote.ip) or address.port != port:
-        stderr.writeLine "stream: invalid host attempted connection (host: [$1]:$2, expected: [$3]:$4)" % [
+        streamTrace "stream: invalid host attempted connection (host: [$1]:$2, expected: [$3]:$4)" % [
           $address.address, $address.port, $parseAddress(remote.ip), $port]
         conn.close(JustClose)
         continue
 
       defer:
-        stderr.writeLine "stream: connection finished (", address, ")"
+        streamTrace("stream: connection finished (", address, ")")
       server.incomingConnections.recvClose(JustClose)
       let streamPipe = await getStream()
       let res = tryAwait pipe(conn.BytePipe, streamPipe)
       if res.isError:
-        stderr.writeLine("stream: piping finished with error ", res)
+        streamTrace("stream: piping finished with error ", res)
       else:
-        stderr.writeLine("stream: piping finished")
+        streamTrace("stream: piping finished")
       return
 
   proc tcpListenImpl(remote: schemas.NodeAddress, port: int32): Future[Stream_tcpListen_Result] {.async.} =
@@ -79,6 +83,10 @@ proc wrapStream*(instance: Instance, getStream: (proc(): Future[BytePipe])): sch
 proc wrapStream*(instance: Instance, stream: BytePipe): schemas.Stream =
   # TODO: if there is more than one connection, things break
   return wrapStream(instance, () => now(just(stream)))
+
+proc wrapStreamFd*(instance: Instance, stream: cint): schemas.Stream =
+  ## Wrap a file descriptor. Do not close it, it will be closed automatically.
+  return wrapStream(instance, streamFromFd(stream))
 
 proc newStreamPair*(instance: Instance): tuple[a: Stream, b: Stream] =
   let (a, b) = newPipe(byte)

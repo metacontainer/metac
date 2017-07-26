@@ -6,8 +6,8 @@ proc copyToTempFile*(instance: Instance, f: schemas.File, sizeLimit: int64=16 * 
   let (inputFd, holder) = await instance.unwrapStream(stream)
   let path = "/tmp/metac_tmp_" & hexUrandom(16)
   let outputFd = await openAt(path, O_EXCL or O_CREAT or O_WRONLY)
-  let output = createOutputFromFd(outputFd.FileFd)
-  let input = createInputFromFd(inputFd.FileFd)
+  let output = createOutputFromFd(outputFd)
+  let input = createInputFromFd(inputFd)
   await pipeLimited(input, output, sizeLimit)
   fakeUsage(holder)
   return path

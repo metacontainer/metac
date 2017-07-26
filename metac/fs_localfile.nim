@@ -11,14 +11,14 @@ proc open(self: LocalFile): Future[cint] =
   return openAt(self.path, finalFlags=O_RDONLY)
 
 proc openAsStream(self: LocalFile): Future[schemas.Stream] {.async.} =
-  let fd = (await self.open).FileFd
+  let fd = await self.open
   let input = createInputFromFd(fd)
   return self.instance.wrapStream(BytePipe(input: input,
                                            output: nullOutput(byte)))
 
 proc nbdSetup(self: LocalFile): Future[schemas.Stream] {.async.} =
   let fd = (await self.open)
-  setBlocking(fd.FileFd)
+  setBlocking(fd)
 
   let files = @[(1.cint, 1.cint), (2.cint, 2.cint), (3.cint, fd)]
   let (dirPath, cleanup) = createUnixSocketDir()

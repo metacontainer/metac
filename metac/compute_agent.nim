@@ -1,4 +1,4 @@
-import metac/instance, metac/schemas, reactor, capnp, caprpc, os, times, collections, metac/computevm_internal_schema, posix, metac/fs, reactor/process, metac/stream, reactor/ipaddress, osproc, sequtils
+import metac/instance, metac/schemas, reactor, capnp, caprpc, os, times, collections, metac/computevm_internal_schema, posix, metac/fs, reactor/process, metac/stream, reactor/ipaddress, osproc, sequtils, metac/simple_pty
 
 proc parseKernelCmdline(line: string): TableRef[string, string] =
   result = newTable[string, string]()
@@ -21,16 +21,22 @@ type
     holders: seq[Holder]
 
 proc file(self: ProcessImpl, index: uint32): Future[Stream] {.async.} =
+  # implemented by the service
   return nullCap
 
 proc kill(self: ProcessImpl, signal: uint32): Future[void] {.async.} =
+  self.process.kill
   return
 
 proc returnCode(self: ProcessImpl, ): Future[int32] {.async.} =
-  return 0
+  let code = self.process.wait
+  if code.isCompleted:
+    return code.get.int32
+  else:
+    return -1
 
 proc wait(self: ProcessImpl, ): Future[void] {.async.} =
-  return
+  discard (await self.process.wait)
 
 capServerImpl(ProcessImpl, [schemas.Process])
 
@@ -38,18 +44,29 @@ proc launchProcess(self: AgentEnvImpl, d: ProcessDescription): Future[schemas.Pr
   await self.ready
 
   var additionalFiles: seq[tuple[target: cint, src: cint]] = @[]
+  let processImpl = ProcessImpl(holders: @[])
 
+  echo "launch", d.pprint
   defer:
     for f in additionalFiles:
       discard close(f.src)
 
-  for i, fd in d.files:
-    let (unwrappedFd, holder) = await self.instance.unwrapStream(fd.stream)
-    additionalFiles.add((i.cint, unwrappedFd))
+  for fd in d.files:
+    var srcFd: cint
+    if fd.isPty:
+      let stream = await self.instance.unwrapStreamAsPipe(fd.stream)
+      srcFd = await createServerTTY(stream)
+    else:
+      let (unwrappedFd, holder) = await self.instance.unwrapStream(fd.stream)
+      processImpl.holders.add(holder)
+      srcFd = unwrappedFd
 
-  let process = startProcess(d.args, additionalFiles = additionalFiles)
+    for num in fd.targets:
+      additionalFiles.add((num.cint, srcFd))
 
-  return ProcessImpl(process: process).asProcess
+  processImpl.process = startProcess(d.args, additionalFiles = additionalFiles)
+
+  return processImpl.asProcess
 
 capServerImpl(AgentEnvImpl, [AgentEnv])
 
@@ -140,6 +157,10 @@ mount -t devpts pts /mnt/dev/pts
   if chroot("/mnt") != 0:
     echo "chroot failed"
     return
+
+  discard chdir("/")
+
+  await asyncSleep(100)
 
   echo "setup done"
   readyCompleter.complete

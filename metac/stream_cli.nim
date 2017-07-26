@@ -1,5 +1,8 @@
 import reactor, capnp, metac/instance, metac/schemas, metac/stream, metac/persistence, metac/cli_common, strutils, collections, cligen
 
+proc streamFromUri*(instance: Instance, uri: string): Future[Stream] {.async.} =
+  return instance.restore(uri.parseSturdyRef).castAs(Stream)
+
 proc catCmd(uri: string) =
   if uri == nil:
     quit("missing required parameter")

@@ -68,9 +68,13 @@ struct ProcessDescription {
 struct FD {
   isPty @0 :Bool;
   # Should the file descriptor be opened as a virtual terminal?
+  # If isPty is true, this FD will use the Simple PTY Protocol.
 
   stream @1 :Stream;
   # The stream. If null, new stream will be created, later accessible via 'Process.files' method.
+
+  targets @2 :List(UInt32);
+  # List of file descriptor numbers to bind in the target process.
 }
 
 interface Process {

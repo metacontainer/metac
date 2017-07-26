@@ -55,10 +55,25 @@ proc mountCmd(uri: string, path: string, persistent=false) =
 
 dispatchGen(mountCmd)
 
+proc openCmd(uri: string, persistent=false) =
+  if uri == nil:
+    quit("missing required parameter")
+
+  asyncMain:
+    let instance = await newInstance()
+    let file = await instance.fileFromUri(uri, schemas.File)
+    let stream = await file.openAsStream()
+
+    let sref = await stream.castAs(schemas.Persistable).createSturdyRef(nullCap, persistent)
+    echo sref.formatSturdyRef
+
+dispatchGen(openCmd)
+
 proc mainFile*() =
   dispatchSubcommand({
     "export": () => quit(dispatchFileExportCmd(argv, doc="")),
-    "cat": () => quit(dispatchCatCmd(argv, doc=""))
+    "cat": () => quit(dispatchCatCmd(argv, doc="Print the file content to the standard output.")),
+    "open": () => quit(dispatchCatCmd(argv, doc="Turn a file into a stream.")),
   })
 
 proc mainFs*() =

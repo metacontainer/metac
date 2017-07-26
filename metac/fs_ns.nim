@@ -35,10 +35,10 @@ proc mount*(instance: Instance, path: string, fs: Filesystem): Future[tuple[hold
 
   echo "mounting..."
 
-  var flags = fcntl(fd.cint, F_GETFL, 0);
+  var flags = fcntl(fd.cint, F_GETFL, 0)
   if flags == -1:
     raiseOSError(osLastError())
-  discard fcntl(fd.cint, F_SETFL, flags or (O_NONBLOCK));
+  discard fcntl(fd.cint, F_SETFL, flags or (O_NONBLOCK))
 
   # "cache=loose" forces 9p to send page-sized requests serially, which is SLOW for serial reads!
   # In future we will want to write FUSE client that does intelligent read ahead. Or use NFS. Or SSHFS.
