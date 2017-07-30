@@ -6,13 +6,14 @@ type
     instance: ServiceInstance
     launcher: VMLauncher
 
-  ProcessEnvironmentImpl = ref object of RootObj
+  ProcessEnvironmentImpl = ref object of PersistableObj
     instance: ServiceInstance
     description: ProcessEnvironmentDescription
     agentAddress: IpAddress
     myAddress: IpAddress
     vm: VM
     agentEnv: Completer[AgentEnv]
+    localDev: KernelInterface
 
   ProcessImpl = ref object of RootObj
     instance: ServiceInstance
@@ -46,11 +47,15 @@ proc network(self: ProcessEnvironmentImpl, index: uint32): Future[L2Interface] {
 proc destroyProcessEnvironment(self: ProcessEnvironmentImpl) =
   echo "destroy ProcessEnvironmentImpl"
   self.vm.destroy().ignore
+  self.localDev.destroy().ignore
 
 proc destroy(self: ProcessEnvironmentImpl): Future[void] {.async.} =
   destroyProcessEnvironment(self)
 
-capServerImpl(ProcessEnvironmentImpl, [ProcessEnvironment, Destroyable])
+proc wait(self: ProcessEnvironmentImpl): Future[void] {.async.} =
+  await self.vm.castAs(Waitable).wait()
+
+capServerImpl(ProcessEnvironmentImpl, [ProcessEnvironment, Destroyable, Persistable, Waitable])
 
 proc randomAgentNetwork(): IpInterface =
   var arr: array[16, uint8]
@@ -103,12 +108,13 @@ proc serialPortHandler(instance: Instance, s: Stream) {.async.} =
 const kernelPath {.strdefine.} = "vmlinuz"
 const initrdPath {.strdefine.} = "initrd.cpio"
 
-proc launchEnv(self: ComputeVmService, envDescription: ProcessEnvironmentDescription): Future[ProcessEnvironment] {.async.} =
+proc launchEnv(self: ComputeVmService, envDescription: ProcessEnvironmentDescription, runtimeId: string=nil): Future[ProcessEnvironment] {.async.} =
   var env: ProcessEnvironmentImpl
   new(env, destroyProcessEnvironment)
   env.instance = self.instance
   env.agentEnv = newCompleter[AgentEnv]()
   env.description = envDescription
+  env.persistenceDelegate = self.instance.makePersistenceDelegate("computevm:env", description=envDescription.toAnyPointer, runtimeId=runtimeId)
 
   let kernel = localFile(self.instance, expandFilename(getAppDir() / kernelPath))
   let initrd = localFile(self.instance, expandFilename(getAppDir() / initrdPath))
@@ -116,7 +122,8 @@ proc launchEnv(self: ComputeVmService, envDescription: ProcessEnvironmentDescrip
 
   let netNamespace = await self.instance.getServiceAdmin("network", NetworkServiceAdmin).rootNamespace
   let localDevName = "mcag" & hexUrandom(5)
-  let localDev = await netNamespace.createInterface(localDevName).l2interface
+  env.localDev = await netNamespace.createInterface(localDevName)
+  let localDev = await env.localDev.l2interface
 
   var additionalNetworks: seq[Network] = @[]
 
@@ -202,7 +209,10 @@ proc launchProcess(self: ProcessEnvironmentImpl, description: ProcessDescription
 proc launch(self: ComputeVmService, processDescription: ProcessDescription,
             envDescription: ProcessEnvironmentDescription): Future[ComputeLauncher_launch_Result] {.async.} =
   let env = await self.launchEnv(envDescription)
-  let process = await env.launchProcess(processDescription)
+  let process = if processDescription.args != nil:
+                  await env.launchProcess(processDescription)
+                else:
+                  nullCap
   return ComputeLauncher_launch_Result(process: process, env: env)
 
 capServerImpl(ComputeVmService, [ComputeLauncher])
@@ -216,11 +226,14 @@ proc main*() {.async.} =
   let serviceImpl = ComputeVmService(instance: instance, launcher: vmLauncher)
   let serviceAdmin = serviceImpl.asComputeLauncher
 
-  await instance.registerRestorer(
-    proc(d: CapDescription): Future[AnyPointer] =
-      case d.category:
-      else:
-        return error(AnyPointer, "unknown category"))
+  proc restore(d: CapDescription): Future[AnyPointer] {.async.} =
+    case d.category:
+    of "computevm:env":
+      return launchEnv(serviceImpl, d.description.castAs(ProcessEnvironmentDescription), runtimeId=d.runtimeId).toAnyPointerFuture
+    else:
+      asyncRaise "unknown category"
+
+  await instance.registerRestorer(restore)
 
 
   await instance.runService(

@@ -8,12 +8,17 @@ type
 
   StoredCap = ref object
     instance: Instance
+    service: PersistenceServiceImpl
+    stopped: bool
+    serviceName: string
+    refs: seq[string]
 
     runtimeId: string
     category: string
     persistent: bool
     serializedDescription: string # present if persistent == true
     description: AnyPointer # present if persistent == false
+    summary: string
 
     restorer: Restorer
 
@@ -51,12 +56,40 @@ proc restoreUsingRestorer(self: StoredCap): Future[CapServer] {.async.} =
   else:
     return self.restorer.restoreFromDescription(CapDescription(category: self.category, runtimeId: self.runtimeId, description: description)).castAs(CapServer)
 
+proc forget(self: StoredCap) {.async.} =
+  if self.stopped:
+    return
+
+  echo "fogetting about ", self.category
+
+  self.stopped = true
+  self.cap = error(CapServer, "cap removed")
+  self.capCompleter = nil
+  self.description = nil
+
+  if self.serviceName in self.service.handlers:
+    let handler = self.service.handlers[self.serviceName]
+    for sturdyRef in self.refs:
+      handler.capBySturdyRef.del sturdyRef
+
+    handler.capByRuntimeId.del self.runtimeId
+
+  if not self.retryRestore.getFuture.isCompleted:
+    self.retryRestore.complete
+
 proc capRestoreThread(self: StoredCap) {.async.} =
   var consecutiveFailureCount = 0
-  while true:
-    echo "restoring..."
-    let obj = tryAwait restoreUsingRestorer(self)
-    echo self.category, " capability restore returned"
+  var firstIteration = true
+  while not self.stopped:
+    var obj: Result[CapServer]
+    if firstIteration and self.cap.isCompleted: # ref just created
+      obj = self.cap.getResult
+    else:
+      echo "restoring..."
+      obj = tryAwait restoreUsingRestorer(self)
+      echo self.category, " capability restore returned"
+
+    firstIteration = false
 
     if self.cap.isCompleted:
       self.capCompleter = newCompleter[CapServer]()
@@ -64,10 +97,6 @@ proc capRestoreThread(self: StoredCap) {.async.} =
 
     self.capCompleter.completeFrom(obj)
     self.cap.ignore # to display error message, if needed
-
-    if not self.persistent:
-      # we do not retry restore
-      return
 
     if obj.isSuccess:
       # we shall wait until restored capability fails
@@ -80,6 +109,11 @@ proc capRestoreThread(self: StoredCap) {.async.} =
 
       self.capCompleter = newCompleter[CapServer]()
       self.cap = self.capCompleter.getFuture
+
+    if not self.persistent:
+      # we do not retry restore
+      await self.forget
+      return
 
     consecutiveFailureCount += 1
 
@@ -109,8 +143,8 @@ proc registerRestorer(self: ServicePersistenceHandlerImpl, restorer: Restorer): 
 proc persist(self: ServicePersistenceHandlerImpl, storedCap: StoredCap, rgroup: ResourceGroup): Future[void] {.async.} =
   storedCap.serializedDescription = await packWithCaps(storedCap.description, rgroup)
   storedCap.description = nil
-  self.service.dbConn.exec(sql"insert into caps values (?, ?, ?, ?)",
-                           self.name, storedCap.runtimeId, storedCap.category, encodeHex(storedCap.serializedDescription))
+  self.service.dbConn.exec(sql"insert into caps values (?, ?, ?, ?, ?)",
+                           self.name, storedCap.runtimeId, storedCap.category, encodeHex(storedCap.serializedDescription), storedCap.summary)
   storedCap.persistent = true
 
 proc addPersistentRef(self: ServicePersistenceHandlerImpl, storedCap: StoredCap, sturdyRef: string) =
@@ -120,18 +154,29 @@ proc addPersistentRef(self: ServicePersistenceHandlerImpl, storedCap: StoredCap,
 proc createSturdyRef(self: ServicePersistenceHandlerImpl; rgroup: ResourceGroup;
                      description: CapDescription; persistent: bool; cap: AnyPointer): Future[MetacSturdyRef] {.async.} =
   let cap = cap.castAs(CapServer)
-  let sturdyRefId = urandom(32)
+  let sturdyRefId = urandom(16)
   let sturdyRef = self.name & "\0" & sturdyRefId
 
   if description.runtimeId notin self.capByRuntimeId:
-    self.capByRuntimeId[description.runtimeId] = StoredCap(description: description.description,
-                                                           runtimeId: description.runtimeId,
-                                                           category: description.category,
-                                                           capCompleter: nil,
-                                                           cap: just(cap))
+    let summary = await cap.castAs(Persistable).summary
+    self.capByRuntimeId[description.runtimeId] = StoredCap(
+      serviceName: self.name,
+      service: self.service, instance: self.service.instance,
+      refs: @[],
+      description: description.description,
+      summary: summary,
+      runtimeId: description.runtimeId,
+      category: description.category,
+      capCompleter: nil,
+      isRestoreStarted: true,
+      cap: just(cap),
+      retryRestore: newCompleter[void]())
+
+    capRestoreThread(self.capByRuntimeId[description.runtimeId]).ignore
 
   let storedCap = self.capByRuntimeId[description.runtimeId]
   self.capBySturdyRef[sturdyRefId] = storedCap
+  storedCap.refs.add sturdyRefId
 
   if persistent:
     if description.category == nil:
@@ -164,6 +209,9 @@ proc getHandlerImpl(self: PersistenceServiceImpl, serviceId: string): ServicePer
 proc getHandlerFor(self: PersistenceServiceImpl, serviceId: ServiceId): Future[ServicePersistenceHandler] =
   return just(self.getHandlerImpl(serviceId).asServicePersistenceHandler)
 
+proc listObjects(self: PersistenceServiceImpl): Future[seq[PersistentObjectInfo]] {.async.} =
+  return @[]
+
 proc restore(self: PersistenceServiceImpl, objectInfo: AnyPointer): Future[AnyPointer] {.async.} =
   let objectId = objectInfo.castAs(string).split("\0", 1)
   let serviceName = objectId[0]
@@ -188,25 +236,29 @@ proc initService(instance: ServiceInstance): PersistenceServiceImpl =
                                     instance: instance,
                                     dbConn: db_sqlite.open(path, nil, nil, nil))
   self.dbConn.exec(sql"create table if not exists refs (service text, sturdyRef blob, runtimeId text, primary key (service, sturdyRef));")
-  self.dbConn.exec(sql"create table if not exists caps (service text, runtimeId text, category text, description blob, primary key (service, runtimeId));")
+  self.dbConn.exec(sql"create table if not exists caps (service text, runtimeId text, category text, description blob, summary text, primary key (service, runtimeId));")
 
   # drop caps without references
   self.dbConn.exec(sql"delete from caps where (select count(*) = 0 from refs where refs.runtimeId = caps.runtimeId and refs.service = caps.service)")
 
-  for row in self.dbConn.getAllRows(sql"select service, runtimeId, category, description from caps"):
+  for row in self.dbConn.getAllRows(sql"select service, runtimeId, category, description, summary from caps"):
     let service = row[0]
     let runtimeId = row[1]
     let category = row[2]
     let serializedDescription = decodeHex(row[3])
+    let summary = row[4]
 
     let capCompleter = newCompleter[CapServer]()
     self.getHandlerImpl(service).capByRuntimeId[runtimeId] = StoredCap(
+      service: self, serviceName: service,
       instance: instance, serializedDescription: serializedDescription,
       runtimeId: runtimeId,
       category: category,
       persistent: true,
+      refs: @[],
       cap: capCompleter.getFuture,
       capCompleter: capCompleter,
+      summary: summary,
       retryRestore: newCompleter[void]())
 
   for row in self.dbConn.getAllRows(sql"select service, sturdyRef, runtimeId  from refs"):

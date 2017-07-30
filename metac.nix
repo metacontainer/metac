@@ -201,7 +201,7 @@ Description: MetaContainer - decentralized container orchestration
 systemctl daemon-reload
 systemctl enable metac.target
 systemctl enable metac-bridge
-for name in $pkgs; do
+for name in persistence vm fs network computevm; do
     systemctl enable metac-$name
 done
 '';

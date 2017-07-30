@@ -12,7 +12,7 @@ nim c -d:musl \
     --nimcache:nimcache \
     --out:build/compute_agent \
     --passc:"-I$linuxHeaders/include" \
-    --passl:"-static" \
+    --passl:"-static -lutil" \
     --gcc.linkerexe:"$musl/bin/musl-gcc" \
     --gcc.exe:"$musl/bin/musl-gcc" \
     metac/compute_agent.nim

@@ -38,6 +38,7 @@ proc network(self: VMImpl, index: int32): Future[L2Interface] {.async.}
 proc serialPort(self: VMImpl, index: int32): Future[Stream] {.async.}
 proc stop(self: VMImpl): Future[void] {.async.}
 proc destroy(self: VMImpl): Future[void] {.async.}
+proc wait(self: VMImpl): Future[void] {.async.}
 
 capServerImpl(VMImpl, [VM, Persistable, Waitable])
 
@@ -65,6 +66,9 @@ proc destroyVM(self: VMImpl) =
 
 proc destroy(self: VMImpl): Future[void] {.async.} =
   destroyVM(self)
+
+proc wait(self: VMImpl): Future[void] {.async.} =
+  discard (await self.process.wait())
 
 proc launchVM(instance: ServiceInstance, config: LaunchConfiguration, persistenceDelegate: PersistenceDelegate=nil): Future[VM] {.async.} =
   var vm: VMImpl

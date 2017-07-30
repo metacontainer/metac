@@ -64,7 +64,13 @@ proc launchProcess(self: AgentEnvImpl, d: ProcessDescription): Future[schemas.Pr
     for num in fd.targets:
       additionalFiles.add((num.cint, srcFd))
 
-  processImpl.process = startProcess(d.args, additionalFiles = additionalFiles)
+  let additionalEnv = d.envVars.map(x => split2(x, "="))
+
+  processImpl.process = startProcess(d.args,
+                                     detached = true,
+                                     additionalFiles = additionalFiles,
+                                     additionalEnv = additionalEnv,
+                                     uid = d.uid.int, gid = d.gid.int)
 
   return processImpl.asProcess
 
@@ -78,6 +84,8 @@ proc execCmd(s: string) =
 proc execCmd(args: seq[string]) =
   execCmd(args.map(x => quoteShell(x)).join(" "))
 
+proc unsetenv(name: cstring): cint {.importc, discardable.}
+
 proc main {.async.} =
   execCmd("""
 mkdir -p /proc /sys /dev /mnt
@@ -89,6 +97,8 @@ mount -t devtmpfs dev /dev
 mkdir -p /dev/pts
 mount -t devpts pts /dev/pts
 """)
+
+  unsetenv("TERM")
 
   let options = parseKernelCmdline(readFile("/proc/cmdline"))
 
@@ -135,23 +145,27 @@ mount -t devpts pts /mnt/dev/pts
   # Network
   echo "setting up network..."
   for i, net in envDescription.networks:
-    let originalName = "eth" & ($(i + 1))
+    var name = "eth" & ($(i + 1))
+
+    if net.name != nil:
+       execCmd(@["ip", "link", "set", "dev", name, "name", net.name])
+       name = net.name
+
+    execCmd(@["ip", "link", "set", "dev", name, "up"])
+
     for address0 in net.addresses:
       var address = address0
       if '/' in address:
         address = $parseInterface(address)
       else:
         address = $parseAddress(address)
-      execCmd(@["ip", "address", "add", "dev", originalName, address])
+      execCmd(@["ip", "address", "add", "dev", name, address])
 
     for route in net.routes:
       if route.via == nil:
-        execCmd(@["ip", "route", "add", $parseInterface(route.network), "dev", originalName])
+        execCmd(@["ip", "route", "add", $parseInterface(route.network), "dev", name])
       else:
         execCmd(@["ip", "route", "add", $parseInterface(route.network), $parseAddress(route.via)])
-
-    if net.name != nil:
-      execCmd(@["ip", "link", "set", "dev", originalName, "name", net.name])
 
   # TODO: pivot_root?
   if chroot("/mnt") != 0:

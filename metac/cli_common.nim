@@ -30,3 +30,6 @@ proc dispatchSubcommand*[T](handlers: openarray[(string, T)]) =
 
   stderr.writeLine("Invalid subcommand '$1'. Expected one of: $2." % [arg, expected.join(", ")])
   quit(1)
+
+import reactor, capnp, metac/instance, metac/schemas, metac/persistence, collections, cligen
+export reactor, capnp, instance, schemas, persistence, collections, cligen

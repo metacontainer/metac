@@ -2,7 +2,7 @@
 import os, strutils, reactor, collections
 import metac/cli_common
 import metac/vm, metac/fs, metac/persistence_service, metac/computevm_service, metac/network_service, metac/sound_service, metac/bridge
-import metac/fs_cli, metac/stream_cli, metac/network_cli, metac/sound_cli, metac/persistence_cli, metac/compute_cli
+import metac/fs_cli, metac/stream_cli, metac/network_cli, metac/sound_cli, metac/persistence_cli, metac/compute_cli, metac/common_cli
 import tests/vm_test, tests/compute_test
 
 dispatchSubcommand({
@@ -14,6 +14,8 @@ dispatchSubcommand({
   "sound": (() => sound_cli.main()),
   "ref": (() => persistence_cli.main()),
   "run": (() => compute_cli.mainRun()),
+
+  "destroy": (() => common_cli.mainDestroy()),
 
   "bridge": (() => bridge.main().runMain()),
 

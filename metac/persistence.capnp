@@ -12,6 +12,9 @@ interface PersistenceService extends (Metac.Service) {
 interface Persistable extends (Metac.Waitable) {
   createSturdyRef @0 (rgroup :Metac.ResourceGroup, persistent :Bool) -> (id :Metac.MetacSturdyRef);
   # Create unguessable reference to this object and return it.
+
+  summary @1 () -> (info :Text);
+  # Return human readable description.
 }
 
 # For service authors.
@@ -26,8 +29,24 @@ interface Restorer {
    restoreFromDescription @0 (description :CapDescription) -> (cap :AnyPointer);
 }
 
+struct PersistentObjectInfo {
+   service @1 :Text;
+
+   category @2 :Text;
+
+   runtimeId @4 :Text;
+
+   persistent @3 :Bool;
+
+   description @5 :Text;
+
+   references @0 :List(Text);
+}
+
 interface PersistenceServiceAdmin {
    getHandlerFor @0 (service :Metac.ServiceId) -> (handler :ServicePersistenceHandler);
+
+   listObjects @1 () -> (infos :List(PersistentObjectInfo));
 }
 
 interface ServicePersistenceHandler {

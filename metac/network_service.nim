@@ -136,7 +136,7 @@ proc getName(self: KernelInterfaceImpl): Future[string] {.async.} =
   return self.name
 
 proc destroy(self: KernelInterfaceImpl): Future[void] {.async.} =
-  return
+  await execCmd(@["ip", "link", "del", self.name])
 
 proc rename(self: KernelInterfaceImpl, newname: string): Future[void] {.async.} =
   return

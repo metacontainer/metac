@@ -16,6 +16,10 @@ proc wait*[T: PersistableObj](self: T): Future[void] =
   ## Default wait the never returns. (The method will appear to return on receiver side when the connection is broken)
   return waitForever()
 
+proc summary*[T: PersistableObj](self: T): Future[string] {.async.} =
+  ## Return object summary
+  return self.pprint
+
 proc makePersistenceDelegate*(instance: ServiceInstance, category: string, description: AnyPointer, runtimeId: string=nil): PersistenceDelegate =
   let runtimeId = if runtimeId == nil: hexUrandom(32) else: runtimeId
 
@@ -62,22 +66,25 @@ proc formatSturdyRef*(m: MetacSturdyRef): string =
 
   discard parseAddress(m.node.ip)
 
-  let name = if m.service.named == "persistence": "-"
-             else: m.service.named
+  let name = if m.service.named == "persistence": ""
+             else: m.service.named & "/"
 
-  return "ref://[" & m.node.ip & "]/" & name & "/" & urlsafeBase64Encode(packPointer(m.objectInfo).compressCapnp)
+  return "ref://[" & m.node.ip & "]/" & name & urlsafeBase64Encode(packPointer(m.objectInfo).compressCapnp)
 
 proc parseSturdyRef*(s: string): MetacSturdyRef =
   if not s.startswith("ref://"):
     raise newException(ValueError, "invalid sturdy ref ($1), doesn't begin with ref://" % s)
 
   let spl = s.split('/')
+  if spl.len notin {4, 5}:
+    raise newException(ValueError, "invalid sturdy ref ($1), too many slashes")
   let ip = spl[2].strip(trailing=false, chars={'['}).strip(leading=false, chars={']'})
-  let serviceName = if spl[3] == "-": "persistence"
+  let serviceName = if spl.len == 4: "persistence"
                     else: spl[3]
+  let data = spl[^1]
   if not validIdentifier(serviceName):
     raise newException(ValueError, "invalid service name")
-  let objectInfo = newUnpackerFlat(urlsafeBase64Decode(spl[4]).decompressCapnp).unpackPointer(0, AnyPointer)
+  let objectInfo = newUnpackerFlat(urlsafeBase64Decode(data).decompressCapnp).unpackPointer(0, AnyPointer)
 
   return MetacSturdyRef(node: NodeAddress(ip: ip),
                         service: ServiceId(kind: ServiceIdKind.named, named: serviceName),

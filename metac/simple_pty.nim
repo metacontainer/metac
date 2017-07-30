@@ -26,15 +26,21 @@ var modeSaved: bool
 proc restoreGlobalMode() {.noconv.} =
   discard tcsetattr(0, TCSADRAIN, addr globalSavedMode)
 
+proc writeErrorMessage(data: string) =
+  restoreGlobalMode()
+  stderr.write(data)
+  stderr.flushFile
+
 proc restoreModeAtExit() =
   if not modeSaved:
+    errorMessageWriter = writeErrorMessage
     globalSavedMode = saveMode(0)
     modeSaved = true
     addQuitProc(restoreGlobalMode)
 
 proc wrapClientTTY*(fd: cint, conn: BytePipe): Future[void] {.async.} =
   ## Start SPTY client.
-  let tty = streamFromFd(dup(fd))
+  let tty = streamFromFd(dupCloexec(fd))
 
   restoreModeAtExit()
   var termMode = saveMode(fd)
@@ -89,9 +95,12 @@ proc createServerTTY*(conn: BytePipe): Future[cint] {.async.} =
   if openpty(addr master, addr slave, nil, nil, nil) != 0:
     asyncRaise "openpty failed"
 
-  # let slaveDup = dup(slave)
-  let ttyFd = dup(master)
+  let ttyFd = dupCloexec(master)
   let tty = streamFromFd(master)
+
+  setCloexec(master)
+  setCloexec(ttyFd)
+  setCloexec(slave)
 
   proc handleWrites() {.async.} =
     defer: discard close(ttyFd)

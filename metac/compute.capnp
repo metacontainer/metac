@@ -63,6 +63,9 @@ struct ProcessDescription {
   uid @2 :UInt32;
   gid @3 :UInt32;
   # User and group identifier for this process.
+
+  envVars @4 :List(Text);
+  # List of environment variables (K=V pairs).
 }
 
 struct FD {
