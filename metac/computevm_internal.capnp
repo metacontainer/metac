@@ -9,3 +9,8 @@ interface AgentEnv {
 interface AgentBootstrap {
   init @0 (env :AgentEnv) -> (envDescription :Compute.ProcessEnvironmentDescription);
 }
+
+struct StoredProcessDescription {
+  description @0 :Compute.ProcessDescription;
+  env @1 :Compute.ProcessEnvironment;
+}

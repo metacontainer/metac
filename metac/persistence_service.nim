@@ -210,7 +210,21 @@ proc getHandlerFor(self: PersistenceServiceImpl, serviceId: ServiceId): Future[S
   return just(self.getHandlerImpl(serviceId).asServicePersistenceHandler)
 
 proc listObjects(self: PersistenceServiceImpl): Future[seq[PersistentObjectInfo]] {.async.} =
-  return @[]
+  var objects: seq[PersistentObjectInfo] = @[]
+  for serviceName, handler in self.handlers:
+    for _, cap in handler.capByRuntimeId:
+      objects.add PersistentObjectInfo(
+        service: serviceName,
+        category: cap.category,
+        runtimeId: cap.runtimeId,
+        persistent: cap.persistent,
+        summary: cap.summary,
+        references: @[],
+      )
+  return objects
+
+proc forgetObject(self: PersistenceServiceImpl, serviceName: string, runtimeId: string) {.async.} =
+  await self.handlers[serviceName].capByRuntimeId[runtimeId].forget
 
 proc restore(self: PersistenceServiceImpl, objectInfo: AnyPointer): Future[AnyPointer] {.async.} =
   let objectId = objectInfo.castAs(string).split("\0", 1)

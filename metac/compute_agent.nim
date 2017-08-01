@@ -84,7 +84,7 @@ proc execCmd(s: string) =
 proc execCmd(args: seq[string]) =
   execCmd(args.map(x => quoteShell(x)).join(" "))
 
-proc unsetenv(name: cstring): cint {.importc, discardable.}
+proc unsetenv(name: cstring): cint {.importc, discardable, header: "<stdlib.h>".}
 
 proc main {.async.} =
   execCmd("""

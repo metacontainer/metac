@@ -55,11 +55,11 @@ get_dep() {
 
 echo "path: \".\"" > nim.cfg
 
-get_dep capnp https://github.com/zielmicha/capnp.nim 32a6ab5639bdd93ce091f1395d2e333e87d64396 ''
+get_dep capnp https://github.com/zielmicha/capnp.nim ed9bc455f95963df10995d731440b7030d081682 ''
 get_dep cligen https://github.com/c-blake/cligen 493e06338b3fd0b740629823f347b73e5e6853f9 ''
 get_dep collections https://github.com/zielmicha/collections.nim 97b301fee58048102462d9826416fffa66b31dd9 ''
 get_dep morelinux https://github.com/zielmicha/morelinux 65edae5c9071ad5afc002611ea8f396fee9de000 ''
-get_dep reactor https://github.com/zielmicha/reactor.nim 18eb80895f69649132186c0f8a26c8a2c8ef1445 ''
+get_dep reactor https://github.com/zielmicha/reactor.nim e7497e01f14f2d3f0880127eb26c6ae768bf0a68 ''
 
 echo '# reactor.nim requires pthreads
 threads: "on"

@@ -12,7 +12,8 @@ dispatchSubcommand({
   "stream": (() => stream_cli.main()),
   "network": (() => network_cli.main()),
   "sound": (() => sound_cli.main()),
-  "ref": (() => persistence_cli.main()),
+  "obj": (() => persistence_cli.mainObj()),
+  "ref": (() => persistence_cli.mainRef()),
   "run": (() => compute_cli.mainRun()),
 
   "destroy": (() => common_cli.mainDestroy()),

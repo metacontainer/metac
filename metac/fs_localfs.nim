@@ -8,6 +8,7 @@ type
 proc getSubtree(fs: LocalFilesystem, path: string): Future[Filesystem] {.async.}
 proc v9fsStream(fs: LocalFilesystem): Future[Stream] {.async.}
 proc getFile(fs: LocalFilesystem, path: string): Future[schemas.File] {.async.}
+proc summary(fs: LocalFilesystem): Future[string] {.async.} = return fs.path
 
 capServerImpl(LocalFilesystem, [Filesystem, Persistable, Waitable])
 
@@ -20,12 +21,18 @@ proc localFsPersistable(instance: ServiceInstance, path: string): schemas.Filesy
     category="fs:localfs", description=toAnyPointer(path)))
 
 proc getSubtree(fs: LocalFilesystem, path: string): Future[Filesystem] {.async.} =
-  return localFs(fs.instance, safeJoin(fs.path, path),
-                 makePersistenceCallDelegate(fs.instance, fs.asFilesystem, Filesystem_getSubtree_Params(name: path)))
+  if fs.path == "/":
+    return localFsPersistable(fs.instance, path)
+  else:
+    return localFs(fs.instance, safeJoin(fs.path, path),
+                   makePersistenceCallDelegate(fs.instance, fs.asFilesystem, Filesystem_getSubtree_Params(name: path)))
 
 proc getFile(fs: LocalFilesystem, path: string): Future[schemas.File] {.async.} =
-  return localFile(fs.instance, safeJoin(fs.path, path),
-                   makePersistenceCallDelegate(fs.instance, fs.asFilesystem, Filesystem_getFile_Params(name: path)))
+  if fs.path == "/":
+    return localFilePersistable(fs.instance, path)
+  else:
+    return localFile(fs.instance, safeJoin(fs.path, path),
+                     makePersistenceCallDelegate(fs.instance, fs.asFilesystem, Filesystem_getFile_Params(name: path)))
 
 const diodPath {.strdefine.} = "metac-diod"
 

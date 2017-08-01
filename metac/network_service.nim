@@ -127,8 +127,11 @@ proc setupVxlan(selfL2: L2InterfaceImpl, remote: NodeAddress, dstPort: uint16, v
   await self.createVxlan(port.int, remote, dstPort.int, vniNum.int)
   return L2Interface_setupVxlan_Result(local: self.instance.nodeAddress, srcPort: port.uint16, holder: nullCap)
 
+proc wait(selfL2: L2InterfaceImpl): Future[void] {.async.} =
+  await selfL2.iface.wait
+
 enableCastToLocal(L2InterfaceImpl)
-capServerImpl(L2InterfaceImpl, [L2Interface, CastToLocal])
+capServerImpl(L2InterfaceImpl, [L2Interface, CastToLocal, Waitable])
 
 proc l2Interface(self: KernelInterfaceImpl): Future[L2Interface] {.async.}
 

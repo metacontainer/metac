@@ -30,7 +30,6 @@ proc runCmd() {.async.} =
     filesystems: @[],
     networks: @[],
     memory: 1024,
-
   )
   var processDescription = ProcessDescription(
     args: @[],
@@ -47,7 +46,7 @@ proc runCmd() {.async.} =
   var envRef: ProcessEnvironment = nullCap
   var existingEnv = false
 
-  for kind, key, val in getopt(cmdline = argv, longBools = @["pty", "persistent", "env-only"]):
+  for kind, key, val in getopt(cmdline = argv, longBools = @["pty", "persistent", "env-only", "background"]):
     case kind
     of cmdArgument:
       processDescription.args.add key

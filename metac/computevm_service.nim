@@ -15,10 +15,11 @@ type
     agentEnv: Completer[AgentEnv]
     localDev: KernelInterface
 
-  ProcessImpl = ref object of RootObj
+  ProcessImpl = ref object of PersistableObj
     instance: ServiceInstance
     files: seq[Stream]
     wrapped: Process
+    args: seq[string]
     env: ProcessEnvironmentImpl
 
 proc file(self: ProcessImpl, index: uint32): Future[Stream] {.async.} =
@@ -34,10 +35,16 @@ proc kill(self: ProcessImpl, signal: uint32): Future[void] {.async.} =
 proc returnCode(self: ProcessImpl, ): Future[int32] {.async.} =
   return self.wrapped.returnCode
 
-proc wait(self: ProcessImpl, ): Future[void] {.async.} =
+proc wait(self: ProcessImpl): Future[void] {.async.} =
   await self.wrapped.wait
 
-capServerImpl(ProcessImpl, [Process])
+proc summary(self: ProcessImpl): Future[string] {.async.} =
+  return $(self.args)
+
+proc destroy(self: ProcessImpl): Future[void] {.async.} =
+  await self.kill(15)
+
+capServerImpl(ProcessImpl, [Process, Persistable, Waitable, Destroyable])
 
 proc launchProcess(self: ProcessEnvironmentImpl, description: ProcessDescription): Future[Process] {.async.}
 
@@ -54,6 +61,9 @@ proc destroy(self: ProcessEnvironmentImpl): Future[void] {.async.} =
 
 proc wait(self: ProcessEnvironmentImpl): Future[void] {.async.} =
   await self.vm.castAs(Waitable).wait()
+
+proc summary(self: ProcessEnvironmentImpl): Future[string] {.async.} =
+  return "process environment"
 
 capServerImpl(ProcessEnvironmentImpl, [ProcessEnvironment, Destroyable, Persistable, Waitable])
 
@@ -99,7 +109,6 @@ proc proxyFs(instance: Instance, myAddress: string, fs: Filesystem): Filesystem 
     v9fsStream: v9fsStreamImpl
   ))
 
-
 proc serialPortHandler(instance: Instance, s: Stream) {.async.} =
   let port = await instance.unwrapStreamAsPipe(s)
   asyncFor line in port.input.lines:
@@ -114,7 +123,7 @@ proc launchEnv(self: ComputeVmService, envDescription: ProcessEnvironmentDescrip
   env.instance = self.instance
   env.agentEnv = newCompleter[AgentEnv]()
   env.description = envDescription
-  env.persistenceDelegate = self.instance.makePersistenceDelegate("computevm:env", description=envDescription.toAnyPointer, runtimeId=runtimeId)
+  env.persistenceDelegate = self.instance.makePersistenceDelegate("computevm:env", description=envDescription.toAnyPointer, runtimeId=nil)
 
   let kernel = localFile(self.instance, expandFilename(getAppDir() / kernelPath))
   let initrd = localFile(self.instance, expandFilename(getAppDir() / initrdPath))
@@ -188,7 +197,11 @@ proc launchProcess(self: ProcessEnvironmentImpl, description: ProcessDescription
 
   if description.args.len < 1: asyncRaise "missing args"
 
-  let process = ProcessImpl(instance: self.instance, env: self, files: @[])
+  let process = ProcessImpl(instance: self.instance, env: self, files: @[], args: description.args)
+  process.persistenceDelegate = self.instance.makePersistenceDelegate(
+    "computevm:process",
+    description=StoredProcessDescription(description: description, env: self.asProcessEnvironment).toAnyPointer,
+    runtimeId=nil)
 
   # Fill in null files
   for i in 0..<description.files.len:
@@ -230,6 +243,10 @@ proc main*() {.async.} =
     case d.category:
     of "computevm:env":
       return launchEnv(serviceImpl, d.description.castAs(ProcessEnvironmentDescription), runtimeId=d.runtimeId).toAnyPointerFuture
+    of "computevm:process":
+      let info = d.description.castAs(StoredProcessDescription)
+      # TODO: handle runtimeId
+      return info.env.launchProcess(info.description).toAnyPointerFuture
     else:
       asyncRaise "unknown category"
 

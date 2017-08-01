@@ -38,7 +38,7 @@ struct PersistentObjectInfo {
 
    persistent @3 :Bool;
 
-   description @5 :Text;
+   summary @5 :Text;
 
    references @0 :List(Text);
 }
@@ -47,6 +47,8 @@ interface PersistenceServiceAdmin {
    getHandlerFor @0 (service :Metac.ServiceId) -> (handler :ServicePersistenceHandler);
 
    listObjects @1 () -> (infos :List(PersistentObjectInfo));
+
+   forgetObject @2 (service :Text, runtimeId :Text);
 }
 
 interface ServicePersistenceHandler {
