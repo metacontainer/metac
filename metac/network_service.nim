@@ -6,25 +6,30 @@ type
     instance: ServiceInstance
 
   KernelInterfaceImpl = ref object of PersistableObj
+    persistenceDelegateL2: PersistenceDelegate
     instance: ServiceInstance
     name: string
     isReal: bool
 
-  L2InterfaceImpl = ref object of RootObj
+  L2InterfaceImpl = ref object of PersistableObj
     instance: ServiceInstance
     iface: KernelInterfaceImpl
 
-  BindToImpl = ref object of RootObj
+  BindToImpl = ref object of PersistableObj
+    onFinish: Completer[void]
 
-capServerImpl(BindToImpl, [Holder])
+capServerImpl(BindToImpl, [Holder, Persistable, Waitable])
 
 const auxLinkAlias = "managed by metac network"
 
-proc reserveVxlanPort(address: string): tuple[sock: SocketHandle, port: int] =
+proc htons(a: uint16): uint16 =
+  return cast[uint16](htons(cast[int16](a)))
+
+proc reserveVxlanPort(address: string, port: uint16=0): tuple[sock: SocketHandle, port: int] =
   assert parseAddress(address).kind == ip6
   let sock = socket(AF_INET6, SOCK_DGRAM, 0).SocketHandle
 
-  var address = SockAddr_in6(sin6_family: AF_INET6, sin6_port: 0, sin6_flowinfo: 0, sin6_scope_id: 0, sin6_addr: in6addr_any)
+  var address = SockAddr_in6(sin6_family: AF_INET6, sin6_port: cast[InPort](htons(port)), sin6_flowinfo: 0, sin6_scope_id: 0, sin6_addr: in6addr_any)
   var addrLen: Socklen = sizeof(address).Socklen
   if bindSocket(sock, cast[ptr SockAddr](addr address), addrLen) != 0:
     raise newException(Exception, "failed to bind port for VXLAN")
@@ -32,10 +37,11 @@ proc reserveVxlanPort(address: string): tuple[sock: SocketHandle, port: int] =
   if getsockname(sock, cast[ptr SockAddr](addr address), addr addrLen) != 0 or address.sin6_family != AF_INET6:
     raise newException(Exception, "getsockname failed")
 
-  return (sock, address.sin6_port.int)
+  return (sock, htons(address.sin6_port).int)
 
 proc createBridge(name: string) {.async.} =
   await execCmd(@["ip", "link", "add", "name", name, "type", "bridge"])
+  await execCmd(@["ip", "link", "set", "dev", name, "alias", auxLinkAlias, "up"])
 
 proc setupBridgeFor(self: KernelInterfaceImpl, addToExisting: string=nil): Future[string] {.async.} =
   var bridgeName: string
@@ -68,7 +74,6 @@ proc setupBridgeFor(self: KernelInterfaceImpl, addToExisting: string=nil): Futur
       asyncRaise "'new' link already exists and is not a bridge!"
 
   await execCmd(@["ip", "link", "set", "dev", self.name, "up"])
-  await execCmd(@["ip", "link", "set", "dev", bridgeName, "alias", auxLinkAlias, "up"])
   return bridgeName
 
 proc createVxlan(self: KernelInterfaceImpl, localPort: int, remote: NodeAddress, remotePort: int, vniNum: int): Future[void] {.async.} =
@@ -87,8 +92,9 @@ proc bindTo(selfL2: L2InterfaceImpl, other: L2Interface): Future[Holder] {.async
   let self = selfL2.iface
 
   let (sock, port) = reserveVxlanPort(self.instance.nodeAddress.ip)
+  discard close(sock)
+
   let vniNum = random(1 shl 24)
-  # TODO: defer: close(sock)
   let otherSide = await other.setupVxlan(self.instance.nodeAddress, port.uint16, vniNum.uint32)
 
   if parseAddress(otherSide.local.ip) == parseAddress(self.instance.nodeAddress.ip):
@@ -113,7 +119,6 @@ proc bindTo(selfL2: L2InterfaceImpl, other: L2Interface): Future[Holder] {.async
     # use VXLAN
     await self.createVxlan(port.int, otherSide.local, otherSide.srcPort.int, vniNum)
 
-  # TODO: interface leak, fd leak
   return BindToImpl().asHolder
 
 proc setupVxlan(selfL2: L2InterfaceImpl, remote: NodeAddress, dstPort: uint16, vniNum: uint32): Future[L2Interface_setupVxlan_Result] {.async.} =
@@ -122,7 +127,9 @@ proc setupVxlan(selfL2: L2InterfaceImpl, remote: NodeAddress, dstPort: uint16, v
   if parseAddress(remote.ip) == parseAddress(self.instance.nodeAddress.ip):
     return L2Interface_setupVxlan_Result(local: self.instance.nodeAddress, srcPort: 0, holder: nullCap)
 
-  let (sock, port) = reserveVxlanPort(self.instance.nodeAddress.ip)
+  # TODO: retry logic when port is already used
+  let (sock, port) = reserveVxlanPort(self.instance.nodeAddress.ip, port=dstPort)
+  discard close(sock)
 
   await self.createVxlan(port.int, remote, dstPort.int, vniNum.int)
   return L2Interface_setupVxlan_Result(local: self.instance.nodeAddress, srcPort: port.uint16, holder: nullCap)
@@ -130,8 +137,11 @@ proc setupVxlan(selfL2: L2InterfaceImpl, remote: NodeAddress, dstPort: uint16, v
 proc wait(selfL2: L2InterfaceImpl): Future[void] {.async.} =
   await selfL2.iface.wait
 
+proc summary(self: L2InterfaceImpl): Future[string] {.async.} =
+  return self.iface.name
+
 enableCastToLocal(L2InterfaceImpl)
-capServerImpl(L2InterfaceImpl, [L2Interface, CastToLocal, Waitable])
+capServerImpl(L2InterfaceImpl, [L2Interface, CastToLocal, Persistable, Waitable])
 
 proc l2Interface(self: KernelInterfaceImpl): Future[L2Interface] {.async.}
 
@@ -147,18 +157,21 @@ proc rename(self: KernelInterfaceImpl, newname: string): Future[void] {.async.} 
 proc isHardware(self: KernelInterfaceImpl): Future[bool] {.async.} =
   return self.isReal # TODO: e.g. tunX are not hardware
 
+proc summary(self: KernelInterfaceImpl): Future[string] {.async.} =
+  return self.name
+
 capServerImpl(KernelInterfaceImpl, [KernelInterface, Persistable, Waitable])
 
 proc l2Interface(self: KernelInterfaceImpl): Future[L2Interface] {.async.} =
-  let iface = L2InterfaceImpl(iface: self, instance: self.instance).asL2Interface
-  return injectPersistence(iface,
-                           makePersistenceCallDelegate(self.instance, self.asKernelInterface,
-                                                       KernelInterface_l2interface_Params()))
+  let iface = L2InterfaceImpl(iface: self, instance: self.instance,
+                              persistenceDelegate: self.persistenceDelegateL2).asL2Interface
+  return iface
 
 proc getInterface(self: KernelNetworkNamespaceImpl, name: string): Future[KernelInterface] {.async.} =
   let p = self.instance.makePersistenceDelegate("net:localnet", description=name.toAnyPointer, runtimeId=nil)
+  let p1 = self.instance.makePersistenceDelegate("net:localnet-l2", description=name.toAnyPointer, runtimeId=nil)
 
-  return KernelInterfaceImpl(instance: self.instance, isReal: true, name: name, persistenceDelegate: p).asKernelInterface
+  return KernelInterfaceImpl(instance: self.instance, isReal: true, name: name, persistenceDelegate: p, persistenceDelegateL2: p1).asKernelInterface
 
 proc listInterfaces(self: KernelNetworkNamespaceImpl): Future[seq[KernelInterface]] {.async.} =
   var s: seq[KernelInterface] = @[]
@@ -170,9 +183,10 @@ proc listInterfaces(self: KernelNetworkNamespaceImpl): Future[seq[KernelInterfac
 
 proc createInterface(self: KernelNetworkNamespaceImpl, name: string): Future[KernelInterface] {.async.} =
   let p = self.instance.makePersistenceDelegate("net:newlocalnet", description=name.toAnyPointer, runtimeId=nil)
+  let p1 = self.instance.makePersistenceDelegate("net:newlocalnet-l2", description=name.toAnyPointer, runtimeId=nil)
 
   let iface = KernelInterfaceImpl(instance: self.instance, isReal: false, name: name,
-                                  persistenceDelegate: p)
+                                  persistenceDelegate: p, persistenceDelegateL2: p1)
   discard await iface.setupBridgeFor # create the interface now
   return iface.asKernelInterface
 
@@ -223,6 +237,10 @@ proc main*() {.async.} =
         return rootNamespace.getInterface(d.description.castAs(string)).toAnyPointerFuture
       of "net:newlocalnet":
         return rootNamespace.createInterface(d.description.castAs(string)).toAnyPointerFuture
+      of "net:localnet-l2":
+        return rootNamespace.getInterface(d.description.castAs(string)).l2interface.toAnyPointerFuture
+      of "net:newlocalnet-l2":
+        return rootNamespace.createInterface(d.description.castAs(string)).l2interface.toAnyPointerFuture
       else:
         asyncRaise "unknown category"
 

@@ -19,7 +19,7 @@ rec {
     env = buildEnv { name = name; paths = []; };
     buildInputs = [clang stdenv.glibc.static];
     src = ./third-party/diod;
-    buildPhase = ''clang ${clangMuslCFlags} -static -O2 -flto -fPIE -fstack-protector-strong -DHAVE_GETOPT_H -DHAVE_GETOPT_LONG -D_FORTIFY_SOURCE=2 -DMETA_ALIAS='"diod-metac"' -D_GNU_SOURCE -I libnpclient -I libnpfs -I liblsd -I libdiod -DX_LOCALSTATEDIR='""' -Wall diod/diod.c diod/exp.c diod/fid.c diod/ioctx.c diod/ops.c diod/xattr.c libnpclient/chmod.c libnpclient/fid.c libnpclient/fsys.c libnpclient/mkdir.c libnpclient/mount.c libnpclient/mtfsys.c libnpclient/open.c libnpclient/pool.c libnpclient/read.c libnpclient/readdir.c libnpclient/remove.c libnpclient/stat.c libnpclient/walk.c libnpclient/write.c libnpclient/xattr.c liblsd/error.c liblsd/hash.c liblsd/hostlist.c liblsd/list.c liblsd/thread.c libnpfs/conn.c libnpfs/ctl.c libnpfs/error.c libnpfs/fcall.c libnpfs/fdtrans.c libnpfs/fidpool.c libnpfs/fmt.c libnpfs/np.c libnpfs/npstring.c libnpfs/srv.c libnpfs/trans.c libnpfs/user.c libdiod/diod_auth.c libdiod/diod_conf.c libdiod/diod_log.c libdiod/diod_sock.c -pthread -o diod-server ${clangMuslLdFlags} '';
+    buildPhase = ''clang ${cFlags} -static -O2 -flto -fPIE -fstack-protector-strong -DHAVE_GETOPT_H -DHAVE_GETOPT_LONG -D_FORTIFY_SOURCE=2 -DMETA_ALIAS='"diod-metac"' -D_GNU_SOURCE -I libnpclient -I libnpfs -I liblsd -I libdiod -DX_LOCALSTATEDIR='""' -Wall diod/diod.c diod/exp.c diod/fid.c diod/ioctx.c diod/ops.c diod/xattr.c libnpclient/chmod.c libnpclient/fid.c libnpclient/fsys.c libnpclient/mkdir.c libnpclient/mount.c libnpclient/mtfsys.c libnpclient/open.c libnpclient/pool.c libnpclient/read.c libnpclient/readdir.c libnpclient/remove.c libnpclient/stat.c libnpclient/walk.c libnpclient/write.c libnpclient/xattr.c liblsd/error.c liblsd/hash.c liblsd/hostlist.c liblsd/list.c liblsd/thread.c libnpfs/conn.c libnpfs/ctl.c libnpfs/error.c libnpfs/fcall.c libnpfs/fdtrans.c libnpfs/fidpool.c libnpfs/fmt.c libnpfs/np.c libnpfs/npstring.c libnpfs/srv.c libnpfs/trans.c libnpfs/user.c libdiod/diod_auth.c libdiod/diod_conf.c libdiod/diod_log.c libdiod/diod_sock.c -pthread -o diod-server ${ldFlags} '';
     installPhase = ''mkdir -p $out/bin; cp diod-server $out/bin'';
   };
 
@@ -78,12 +78,13 @@ mv $out/nim/*     $out/     && rmdir $out/nim
 
   nim = nimBootstrap nimCsources;
 
-  #clangMuslCFlags = "-nostdinc -isystem ${musl}/include";
-  #clangMuslLdFlags = "-nostdlib -L${musl}/lib ${musl}/lib/crt1.o ${musl}/lib/crti.o ${musl}/lib/crtn.o -lc -lm -static";
+  #cFlags = "-nostdinc -isystem ${musl}/include -ffunction-sections -fdata-sections";
+  #ldFlags = "-nostdlib -L${musl}/lib ${musl}/lib/crt1.o ${musl}/lib/crti.o ${musl}/lib/crtn.o -lc -lm -static";
+
   # musl crashes diod, compile with glibc for now
-  clangMuslCFlags = "-DSTATIC_GLIBC";
-  clangMuslLdFlags = "-static -lm";
-  clangMuslNim = ''--passl:"${clangMuslLdFlags}" --passc:"${clangMuslCFlags}"'';
+  cFlags = "-DSTATIC_GLIBC";
+  ldFlags = "-static -lm";
+  clangMuslNim = ''--passl:"${ldFlags}" --passc:"${cFlags}"'';
 
   nimArgs = {deps, args}: "${clangMuslNim} --path:${deps.reactor} --path:${deps.collections} --path:${deps.capnp} --path:${deps.collections} --path:${deps.cligen} --path:${deps.morelinux} --path:. --nimcache:nix_nimcache ${args}";
 
@@ -127,28 +128,94 @@ cp ${busyboxStatic}/bin/busybox initrd/bin/busybox
 for name in sh mount ifconfig ip; do
     ln -sf /bin/busybox initrd/bin/$name
 done
+cp ${sshfs}/bin/sshfs initrd/bin/metac-sshfs
+cp ${fuseStatic}/bin/fusermount initrd/bin/fusermount
 (cd initrd && find ./ | cpio -H newc -o | gzip > $out)
 
 '';
     phases = ["buildPhase"];
   };
 
-  overrideMusl = pkg: pkg.overrideDerivation (attrs: rec {
-    buildInputs = attrs.buildInputs ++ [clang];
+  overrideStatic = pkg: pkg.overrideDerivation (attrs: rec {
+    buildInputs = attrs.buildInputs ++ [clang stdenv.glibc.static];
+    enableStatic = true;
     preBuild = ''
       makeFlagsArray=(PREFIX="$out"
                       CC="clang"
-                      CFLAGS="${clangMuslCFlags}"
-                      LDFLAGS="${clangMuslLdFlags}")
+                      CFLAGS="${cFlags}"
+                      LDFLAGS="${ldFlags}")
     '';
   });
 
-  sqliteMusl = overrideMusl pkgs.sqlite;
+  sqliteStatic = overrideStatic pkgs.sqlite;
+  glibStatic = overrideStatic pkgs.glib;
+  fuseStatic = overrideStatic pkgs.fuse;
+
+  sshfs = stdenv.mkDerivation rec {
+    version = "2.9";
+    name = "sshfs-fuse-${version}";
+    enableStatic = true;
+
+    config = ''/* Name of package */
+#define PACKAGE "sshfs"
+
+/* Define to the address where bug reports for this package should be sent. */
+#define PACKAGE_BUGREPORT ""
+
+/* Define to the full name of this package. */
+#define PACKAGE_NAME "sshfs"
+
+/* Define to the full name and version of this package. */
+#define PACKAGE_STRING "sshfs 2.9"
+
+/* Define to the one symbol short name of this package. */
+#define PACKAGE_TARNAME "sshfs"
+
+/* Define to the home page for this package. */
+#define PACKAGE_URL ""
+
+/* Define to the version of this package. */
+#define PACKAGE_VERSION "2.9"
+
+/* Compile ssh NODELAY workaround */
+/* #undef SSH_NODELAY_WORKAROUND */
+
+/* Version number of package */
+#define VERSION "2.9"
+
+#define IDMAP_DEFAULT "none"
+'';
+
+    buildPhase = ''
+echo "$config" > config.h
+gcc -D_FILE_OFFSET_BITS=64 cache.c sshfs.c -DFUSE_USE_VERSION=26 -D_REENTRANT -I${fuseStatic}/include -I${fuseStatic}/include/fuse -I${glibStatic.dev}/include/glib-2.0 -I${glibStatic}/lib/glib-2.0/include -g -O2 -Wall -W -o sshfs  -L${fuseStatic}/lib -L${glibStatic}/lib -lfuse -lgthread-2.0 -pthread -lglib-2.0 -ldl -static
+'';
+    installPhase = ''mkdir -p $out/bin; cp sshfs $out/bin'';
+
+    phases = ["unpackPhase" "buildPhase" "installPhase"];
+
+    src = fetchFromGitHub {
+      repo = "sshfs";
+      owner = "libfuse";
+      rev = "sshfs-${version}";
+      sha256 = "1n0cq72ps4dzsh72fgfprqn8vcfr7ilrkvhzpy5500wjg88diapv";
+    };
+
+    buildInputs = [ pkgconfig glibStatic fuseStatic autoreconfHook stdenv.glibc.static ];
+  };
+
+  sftpServer = pkgs.openssh.overrideDerivation (attrs: rec {
+    name = "sftp-server";
+    buildInputs = attrs.buildInputs ++ [stdenv.glibc.static];
+    buildPhase = ''make libssh.a ./openbsd-compat/libopenbsd-compat.a
+gcc -o sftp-server ${./metac/sftp-server.c} sftp-common.c -Lopenbsd-compat -L. -I.  -fstack-protector-strong -lssh -lopenbsd-compat -Wl,--gc-sections -static -L${stdenv.glibc.static}/lib'';
+    installPhase = ''mkdir -p $out/bin; cp sftp-server $out/bin'';
+  });
 
   metac = options: stdenv.mkDerivation rec {
     name = "metac";
     version = "0.0.1";
-    buildInputs = [nim gawk clang_4 sqliteMusl stdenv.glibc.static]; # sqliteMusl
+    buildInputs = [nim gawk clang_4 sqliteStatic stdenv.glibc.static]; # sqliteStatic
     buildPhase = ''
 cp -r ${./metac} metac
 cp -r ${./tests} tests
@@ -159,7 +226,9 @@ mkdir -p $out/bin/ $out/share/
 ${./util/install-systemd.sh} $out
 cp ${vmInitrd options} $out/share/metac-initrd
 cp ${vmKernel}/bzImage $out/share/metac-vmlinuz
-cp ${diod}/bin/diod-server $out/bin/metac-diod
+#cp {diod}/bin/diod-server $out/bin/metac-diod
+cp ${sshfs}/bin/sshfs $out/bin/metac-sshfs
+cp ${sftpServer}/bin/sftp-server $out/bin/metac-sftp-server
 nim c ${nimArgs options} -d:withSqlite -d:kernelPath="../share/metac-initrd" -d:initrdPath="../share/metac-initrd" --out:$out/bin/metac -d:diodPath="metac-diod" metac/main.nim
 '';
     phases = ["buildPhase" "fixupPhase"];
@@ -196,6 +265,7 @@ Essential: no
 Installed-Size: 1024
 Maintainer: Michał Zieliński <michal@zielinscy.org.pl>
 Description: MetaContainer - decentralized container orchestration
+Dependencies: fuse, ipset, iptables
 '';
     postinst = writeText "postinst" ''
 systemctl daemon-reload

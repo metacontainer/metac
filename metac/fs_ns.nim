@@ -26,35 +26,58 @@ proc listMounts(ns: LocalNamespace): Future[seq[Mount]] {.async.}
 
 capServerImpl(LocalNamespace, [FilesystemNamespace, Persistable, Waitable])
 
-proc mount*(instance: Instance, path: string, fs: Filesystem): Future[tuple[holder: Holder, onFinish: Future[void]]] {.async.} =
-  let stream = await fs.v9fsStream
-  let (fd, holder) = await instance.unwrapStream(stream)
+const sshfsPath {.strdefine.} = "metac-sshfs"
 
+proc mount*(instance: Instance, path: string, fs: Filesystem): Future[tuple[holder: Holder, onFinish: Future[void]]] {.async.} =
   echo "unmounting old filesystem at ", path
   discard (tryAwait execCmd(@["umount", "-l", "/" & path]))
 
-  echo "mounting..."
+  when not defined(use9pForMounts):
+    let stream = await fs.sftpStream
+    let (fd, holder) = await instance.unwrapStream(stream)
 
-  var flags = fcntl(fd.cint, F_GETFL, 0)
-  if flags == -1:
-    raiseOSError(osLastError())
-  discard fcntl(fd.cint, F_SETFL, flags or (O_NONBLOCK))
-
-  # "cache=loose" forces 9p to send page-sized requests serially, which is SLOW for serial reads!
-  # In future we will want to write FUSE client that does intelligent read ahead. Or use NFS. Or SSHFS.
-  let process = startProcess(@["mount", "-t", "9p", "-o", "trans=fd,rfdno=4,wfdno=4,uname=root,msize=131144,aname=/,access=client,cache=mmap", "metacfs", "/" & path],
-                             additionalFiles= @[(4.cint, fd.cint), (0.cint, 0.cint), (1.cint, 1.cint), (2.cint, 2.cint)])
-
-  let onFinish = newCompleter[void]()
-
-  proc closed() =
-    echo "9p connection closed"
+    let process = startProcess(@[getAppDir() / sshfsPath,
+                                 "-f", # foreground
+                                 "-o", "allow_other,default_permissions",
+                                 "-o", "ssh_command=/proc/$1/exe sshfs-mount-helper" % [$getpid()],
+                                 "metacfs:", "/" & path],
+                               additionalFiles= @[(4.cint, fd.cint), (0.cint, 0.cint), (1.cint, 1.cint), (2.cint, 2.cint)])
     discard close(fd)
-    onFinish.completeError("disconnected")
 
-  waitForFdError(fd).then(closed).ignore
+    let onFinish = newCompleter[void]()
 
-  return (holder, onFinish.getFuture)
+    proc closed(code: int) =
+      echo "SSHFS connection closed"
+      onFinish.completeError("disconnected")
+
+    process.wait.then(closed).ignore
+    return (holder, onFinish.getFuture)
+  else:
+    let stream = await fs.v9fsStream
+    let (fd, holder) = await instance.unwrapStream(stream)
+    echo "mounting..."
+
+    # "cache=loose" forces 9p to send page-sized requests serially, which is SLOW for serial reads!
+    # In future we will want to write FUSE client that does intelligent read ahead. Or use NFS. Or SSHFS.
+    let process = startProcess(@["mount", "-t", "9p", "-o", "trans=fd,rfdno=4,wfdno=4,uname=root,msize=131144,aname=/,access=client,cache=mmap", "metacfs", "/" & path],
+                               additionalFiles= @[(4.cint, fd.cint), (0.cint, 0.cint), (1.cint, 1.cint), (2.cint, 2.cint)])
+
+    let onFinish = newCompleter[void]()
+
+    proc closed() =
+      echo "9p connection closed"
+      discard close(fd)
+      onFinish.completeError("disconnected")
+
+    waitForFdError(fd).then(closed).ignore
+
+    return (holder, onFinish.getFuture)
+
+proc sshfsMountHelper*() {.async.} =
+  let socket = streamFromFd(4)
+  let stdin = streamFromFd(0)
+
+  await pipe(stdin, socket)
 
 proc mount(ns: LocalNamespace, path: string, fs: Filesystem): Future[Mount] {.async.} =
   let (holder, onFinish) = await mount(ns.instance, path, fs)

@@ -38,7 +38,9 @@ proc injectPersistence*[T](cap: T, delegate: PersistenceDelegate): T =
   proc myCreateSturdyRef(rgroup: ResourceGroup, persistent: bool): Future[MetacSturdyRef] =
     return delegate(cap.toCapServer, rgroup, persistent)
 
-  return injectInterface(cap, Persistable, inlineCap(Persistable, PersistableInlineImpl(createSturdyRef: myCreateSturdyRef)).toCapServer)
+  return injectInterface(cap, Persistable, inlineCap(Persistable, PersistableInlineImpl(
+    createSturdyRef: myCreateSturdyRef,
+    summary: (proc(): Future[string] = just("call on $1" % name(T))))).toCapServer)
 
 proc injectPersistence*[T](instance: ServiceInstance, cap: T, category: string, description: AnyPointer, runtimeId: string=nil): T =
   return injectPersistence(instance, cap, makePersistenceDelegate(category, description, runtimeId))

@@ -27,6 +27,8 @@ dispatchSubcommand({
   "network-service": (() => network_service.main().runMain),
   "sound-service": (() => sound_service.main().runMain),
 
+  "sshfs-mount-helper": (() => fs.sshfsMountHelper().runMain),
+
   "vm-test": (() => vm_test.main().runMain()),
   "compute-test": (() => compute_test.main().runMain()),
 })

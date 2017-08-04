@@ -197,4 +197,7 @@ proc forkAgent =
         shutdown()
 
 when isMainModule:
-  forkAgent()
+  if commandLineParams() == @["sshfs-mount-helper"]:
+    sshfsMountHelper().runMain
+  else:
+    forkAgent()

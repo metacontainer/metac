@@ -13,10 +13,16 @@ interface Filesystem {
   # Get file object by name. It doesn't need to exist, the object only represents a path in this filesystem.
   # `name` may not contain symbolic links.
 
+  readonlyFs @3 () -> (fs :Filesystem);
+  # Return readonly version of this filesystem.
+
   # Low level API
 
   v9fsStream @1 () -> (stream :Stream);
   # Shares this filesystem using v9fs (also called 9p).
+
+  sftpStream @4 () -> (stream :Stream);
+  # Shares this filesystem using SFTP protocol.
 }
 
 interface FilesystemService extends (Metac.Service) {
