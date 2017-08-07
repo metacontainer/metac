@@ -1,1 +1,46 @@
-- merge BlockDevice into File
+- check TCP_NODELAY!!!
+
+- add screencast style GIFs
+
+- add MountOptions (cacheForever, uid, gid)
+- add support for changing uid to fs_localfs
+- add support for readonly to fs_localfs
+
+** desktop
+- implement desktop
+- investigate SPICE
+- export apps
+
+** VM
+- cli
+- VNC support
+
+* sandboxing
+write dropcap.so that drop caps on LD_PRELOAD
+
+** external
+
+- [ ] sftp
+ - [X] caps
+ - [ ] device cgroup
+ - [ ] seccomp
+- [ ] sshfs
+- [ ] diod
+
+* metac scope
+** METAC_SCOPE
+creates `ResourceGroup`s
+for use in scripts
+
+``
+export METAC_SCOPE=$(metac scope begin --timeout=10min)
+trap "metac scope end" EXIT
+``
+
+** ref timeout
+automatically destroy references after a timeout
+```
+export METAC_REF_TIMEOUT=10min
+# or
+metac fs export --timeout=10min local:/hello
+```

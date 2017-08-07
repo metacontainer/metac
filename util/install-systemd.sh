@@ -13,7 +13,7 @@ mkdir -p $dir
 cp metac/metac.target $dir/
 cp metac/bridge.service $dir/metac-bridge.service
 
-pkgs="persistence vm fs network computevm"
+pkgs="persistence vm fs network computevm desktop"
 for name in $pkgs; do
     cat <<EOF > $dir/metac-$name.service
 [Unit]

@@ -54,7 +54,7 @@ MetaContainer aims to provide a common interface for sharing various types of re
 - Attach to a desktop session running on another computer:
 
     ```
-    user@host1$ metac desktop export localx11:$DISPLAY
+    user@host1$ metac desktop export localx11:
     ref://[fd6f:e1da:f01c::91f1]/EQHCf25ldHdvcmv_jd-f0AgMxgkBlW3GvIllvw4
     user@host2$ metac desktop attach 'ref://[fd6f:e1da:f01c::91f1]/EQHCf25ldHdvcmv_jd-f0AgMxgkBlW3GvIllvw4'
     ```

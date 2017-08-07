@@ -31,7 +31,7 @@ const
   O_DIRECTORY = 65536
   O_NOFOLLOW = 131072
 
-proc openat(dirfd: cint, pathname: cstring, flags: cint): cint {.importc, header: "<fcntl.h>".}
+proc openat(dirfd: cint, pathname: cstring, flags: cint, mode: cint): cint {.importc, header: "<fcntl.h>".}
 var O_CLOEXEC {.importc, header: "<fcntl.h>"}: cint
 
 proc openAtSync(path: string, finalFlags: cint): cint =
@@ -45,7 +45,7 @@ proc openAtSync(path: string, finalFlags: cint): cint =
       raise newException(ValueError, "invalid path component " & parts[i])
     var flags = if i == parts.len - 1: finalFlags else: O_DIRECTORY
     flags = flags or O_NOFOLLOW or O_CLOEXEC
-    let newFd = retrySyscall(openat(fd, parts[i], flags))
+    let newFd = retrySyscall(openat(fd, parts[i], flags, 0o400))
     discard close(fd)
     fd = newFd
 

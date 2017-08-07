@@ -1,1 +1,1 @@
-(import ./metac.nix).metacDeb
+(import ./metac.nix).metacDebRelease

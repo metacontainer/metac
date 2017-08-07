@@ -1,6 +1,9 @@
-import os, collections, sequtils, reactor, cligen
+import os, collections, sequtils, reactor, cligen, metac/schemas
 
 var argv*: seq[string] = commandLineParams()
+
+proc castAsPersistable[T](t: T): Persistable =
+  t.castAs(schemas.Persistable)
 
 template defineExporter*(name, makeuri) =
   proc name(uri: string, persistent=false) =
@@ -9,8 +12,8 @@ template defineExporter*(name, makeuri) =
 
     asyncMain:
       let instance = await newInstance()
-      let file = await makeuri(instance, uri)
-      let sref = await file.castAs(schemas.Persistable).createSturdyRef(nullCap, persistent)
+      let item = await makeuri(instance, uri)
+      let sref = await castAsPersistable(item).createSturdyRef(nullCap, persistent)
       echo sref.formatSturdyRef
 
   dispatchGen(name)
@@ -48,5 +51,5 @@ proc renderTable*(table: seq[seq[string]]) =
          line &= repeat(' ', colSize[i] + 1 - s.len)
     echo line
 
-import reactor, capnp, metac/instance, metac/schemas, metac/persistence, collections, cligen
+import reactor, capnp, metac/instance, metac/persistence, collections, cligen
 export reactor, capnp, instance, schemas, persistence, collections, cligen

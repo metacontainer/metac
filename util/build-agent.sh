@@ -5,6 +5,8 @@ set -e
 kernel=$(nix-build metac.nix -A vmKernel)
 musl=$(nix-build '<nixpkgs>' -A musl)
 linuxHeaders=$(nix-build '<nixpkgs>' -A linuxHeaders)
+sshfs=$(nix-build metac.nix -A sshfs)
+fuse=$(nix-build metac.nix -A fuseStatic)
 
 ln -sf $kernel/bzImage build/vmlinuz
 
@@ -20,6 +22,9 @@ nim c -d:musl \
 mkdir -p build/initrd/bin
 cp build/compute_agent build/initrd/init
 cp /bin/busybox build/initrd/bin/busybox
+cp $sshfs/bin/sshfs build/initrd/bin/sshfs
+cp $fuseStatic/bin/fusermount build/initrd/bin/fusermount
+du -hs build/initrd/bin/*
 for name in sh mount ifconfig ip; do
     ln -sf /bin/busybox build/initrd/bin/$name
 done

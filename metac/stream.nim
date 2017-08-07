@@ -1,5 +1,7 @@
 import reactor, reactor/unix, caprpc, metac/instance, metac/schemas, collections, os, reactor/unix, posix, reactor/file
 
+const bindfdPath* {.strdefine.} = "bindfd.so"
+
 template unwrapStreamBase(instance, stream, connFunc): untyped =
   let boundSocket = await bindSocketForConnect(parseAddress(instance.address), 0)
   let localAddr = boundSocket.getSockAddr()
@@ -98,6 +100,12 @@ proc wrapUnixSocketAsStream*(instance: Instance, path: string): schemas.Stream =
 
   return wrapStream(instance, () => connectUnix(path).then(x => x.BytePipe))
 
+proc makeUnixAddr(path: string): Sockaddr_un =
+    result.sun_family = AF_UNIX
+    if path.len >= Sockaddr_un_path_length:
+      raise newException(ValueError, "socket path too long")
+    copyMem(addr result.sun_path, path.cstring, path.len + 1)
+
 proc mkdtemp(tmpl: cstring): cstring {.importc, header: "stdlib.h".}
 
 proc createUnixSocketDir*(): tuple[path: string, cleanup: proc()] =
@@ -110,6 +118,22 @@ proc createUnixSocketDir*(): tuple[path: string, cleanup: proc()] =
     removeDir(dirPath)
 
   return (dirPath, finish)
+
+proc wrapUnixServerFdAsStream*(instance: Instance): tuple[serverFd: cint, stream: schemas.Stream, cleanup: proc()] =
+  let (path, cleanup) = createUnixSocketDir()
+  let serverFd = socket(AF_UNIX, SOCK_STREAM, 0)
+  var sockAddr = makeUnixAddr(path & "/socket")
+  if bindSocket(serverFd, cast[ptr SockAddr](addr sockAddr), sizeof(sockAddr).Socklen) != 0:
+    discard close(serverFd)
+    cleanup()
+    raiseOSError(osLastError())
+
+  if listen(serverFd, SOMAXCONN) != 0:
+    discard close(serverFd)
+    cleanup()
+    raiseOSError(osLastError())
+
+  return (serverFd.cint, wrapUnixSocketAsStream(instance, path & "/socket"), cleanup)
 
 proc unwrapStreamToUnixSocket*(instance: Instance, stream: schemas.Stream): Future[string] =
   let (dirPath, cleanup) = createUnixSocketDir()

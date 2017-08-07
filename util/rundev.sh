@@ -24,4 +24,5 @@ rundev add vm-service -- metac vm-service
 rundev add network-service -- metac network-service
 rundev add sound-service -- metac sound-service
 rundev add computevm-service -- metac computevm-service
+rundev add desktop-service -- metac desktop-service
 "

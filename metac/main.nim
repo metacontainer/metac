@@ -1,8 +1,8 @@
 ## Implements the multicall binary (all programs in one binary).
 import os, strutils, reactor, collections
 import metac/cli_common
-import metac/vm, metac/fs, metac/persistence_service, metac/computevm_service, metac/network_service, metac/sound_service, metac/bridge
-import metac/fs_cli, metac/stream_cli, metac/network_cli, metac/sound_cli, metac/persistence_cli, metac/compute_cli, metac/common_cli
+import metac/bridge, metac/vm, metac/fs, metac/persistence_service, metac/computevm_service, metac/network_service, metac/sound_service, metac/desktop_service
+import metac/fs_cli, metac/stream_cli, metac/network_cli, metac/sound_cli, metac/persistence_cli, metac/compute_cli, metac/common_cli, metac/desktop_cli
 import tests/vm_test, tests/compute_test
 
 dispatchSubcommand({
@@ -15,6 +15,7 @@ dispatchSubcommand({
   "obj": (() => persistence_cli.mainObj()),
   "ref": (() => persistence_cli.mainRef()),
   "run": (() => compute_cli.mainRun()),
+  "desktop": (() => desktop_cli.main()),
 
   "destroy": (() => common_cli.mainDestroy()),
 
@@ -26,6 +27,7 @@ dispatchSubcommand({
   "persistence-service": (() => persistence_service.main().runMain),
   "network-service": (() => network_service.main().runMain),
   "sound-service": (() => sound_service.main().runMain),
+  "desktop-service": (() => desktop_service.main().runMain),
 
   "sshfs-mount-helper": (() => fs.sshfsMountHelper().runMain),
 
