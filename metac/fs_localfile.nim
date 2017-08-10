@@ -16,7 +16,7 @@ proc openAsStream(self: LocalFile): Future[schemas.Stream] {.async.} =
   return self.instance.wrapStream(BytePipe(input: input,
                                            output: nullOutput(byte)))
 
-proc nbdSetup(self: LocalFile): Future[schemas.Stream] {.async.} =
+proc openAsNbd(self: LocalFile): Future[schemas.Stream] {.async.} =
   let fd = (await self.open)
   setBlocking(fd)
 
@@ -33,12 +33,7 @@ proc nbdSetup(self: LocalFile): Future[schemas.Stream] {.async.} =
 
   return wrapUnixSocketAsStream(self.instance, socketPath)
 
-proc openAsBlock(self: LocalFile): Future[schemas.BlockDevice] {.async.}
-
-capServerImpl(LocalFile, [schemas.File, BlockDevice, Persistable, Waitable])
-
-proc openAsBlock(self: LocalFile): Future[schemas.BlockDevice] {.async.} =
-  return self.asBlockDevice
+capServerImpl(LocalFile, [schemas.File, Persistable, Waitable])
 
 # LocalFileBlockDev
 

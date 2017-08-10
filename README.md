@@ -18,12 +18,12 @@ MetaContainer aims to provide a common interface for sharing various types of re
    user@host$ metac run --mount=/=local:$PWD/mychroot --pty --service=computevm bash
    ```
 
-- Launch a virtual machine with a disk residing on another computer (e.g. NAS) (cli todo)
+- Launch a virtual machine with a disk image residing on another computer (e.g. NAS)
 
     ```
     user@nas$ metac file export /dev/mapper/nas-vm
     ref://[fd6f:e1da:f01c::91f1]/EQHCf25ldHdvcmv_jd-f0AgMxgkBlW3GvIllvw4
-    user@host$ metac vm start --disk 'ref://[fd6f:e1da:f01c::91f1]/EQHCf25ldHdvcmv_jd-f0AgMxgkBlW3GvIllvw4'
+    user@host$ metac vm start --drive 'uri=ref://[fd6f:e1da:f01c::91f1]/EQHCf25ldHdvcmv_jd-f0AgMxgkBlW3GvIllvw4'
     ```
 
 - Create Ethernet tunnel between two computers

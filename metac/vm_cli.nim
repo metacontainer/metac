@@ -100,6 +100,14 @@ proc mainRun() {.async.} =
           printNetworks.add config.networks.len
 
         config.networks.add network
+      of "drive":
+        let args = parseComplexArg(val, required=["uri"], optional=["driver"])
+        let drive = Drive()
+
+        drive.device = await fileFromUri(instance, args["uri"])
+
+        if "driver" in args:
+          drive.driver = parseEnum[Drive_Driver](args["driver"])
       else:
         stderr.writeLine "invalid option ", key
         writeHelp()

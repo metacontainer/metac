@@ -166,7 +166,7 @@ proc launchVM(instance: ServiceInstance, config: LaunchConfiguration, persistenc
 
   # drives
   for i, drive in config.drives:
-    let nbdStream = await drive.device.nbdSetup()
+    let nbdStream = await drive.device.openAsNbd()
     let nbdPath = await unwrapStreamToUnixSocket(instance, nbdStream)
     cmdline &= [
       "-drive", "format=raw,file=nbd:unix:" & nbdPath

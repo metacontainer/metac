@@ -5,8 +5,6 @@ using Net = import "network.capnp";
 using Stream = import "stream.capnp".Stream;
 using Fs = import "fs.capnp";
 
-using BlockDevice = import "blockdevice.capnp".BlockDevice;
-
 struct LaunchConfiguration {
   struct KernelBoot {
     kernel @0 :Fs.File;
@@ -81,7 +79,7 @@ struct Drive {
   driver @0 :Driver;
   # Driver for the drive.
 
-  device @1 :BlockDevice;
+  device @1 :Fs.File;
   # The block device for this drive.
 }
 

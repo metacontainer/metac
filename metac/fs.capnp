@@ -2,7 +2,6 @@
 
 using Metac = import "metac.capnp";
 using Stream = import "stream.capnp".Stream;
-using BlockDevice = import "blockdevice.capnp".BlockDevice;
 
 interface Filesystem {
   getSubtree @0 (name :Text) -> (fs :Filesystem);
@@ -32,7 +31,7 @@ interface FilesystemService extends (Metac.Service) {
 interface File {
   openAsStream @0 () -> (stream :Stream);
 
-  openAsBlock @1 () -> (device :BlockDevice);
+  openAsNbd @1 () -> (stream :Stream);
 }
 
 interface FilesystemServiceAdmin {

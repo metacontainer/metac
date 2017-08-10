@@ -14,7 +14,6 @@ proc main*() {.async.} =
 
   let kernel = await fs_cli.fileFromUri(instance, "local:" & (getCurrentDir() / "vmlinuz"), schemas.File)
   let drive = await fs_cli.fileFromUri(instance, "local:" & (getCurrentDir() / "openwrt-15.05.1-x86-kvm_guest-rootfs-ext4.img"), schemas.File)
-  let driveBlockDev = await drive.openAsBlock
 
   let config = LaunchConfiguration(
     memory: 512,
@@ -36,7 +35,7 @@ proc main*() {.async.} =
       Network(driver: Network_Driver.virtio, network: nullCap)
     ],
     drives: @[
-      Drive(device: driveBlockDev)
+      Drive(device: drive)
     ]
   )
 
