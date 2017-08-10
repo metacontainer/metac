@@ -24,7 +24,7 @@ proc localFsPersistable(instance: ServiceInstance, path: string): schemas.Filesy
 
 proc getSubtree(fs: LocalFilesystem, path: string): Future[Filesystem] {.async.} =
   if fs.path == "/":
-    return localFsPersistable(fs.instance, path)
+    return localFsPersistable(fs.instance, safeJoin("/", path))
   else:
     return localFs(fs.instance, safeJoin(fs.path, path),
                    makePersistenceCallDelegate(fs.instance, fs.asFilesystem, Filesystem_getSubtree_Params(name: path)))

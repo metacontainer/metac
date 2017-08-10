@@ -26,6 +26,9 @@ proc findObjectById(admin: PersistenceServiceAdmin, runtimeId: string): Future[P
 
   var matching: seq[PersistentObjectInfo] = @[]
 
+  if runtimeId.len < 2:
+    quit("ambigous ID")
+
   for obj in objects:
     if obj.runtimeId.startsWith(runtimeId): matching.add obj
 
@@ -41,9 +44,6 @@ proc rmCmd(runtimeId: string) =
   if runtimeId == nil:
     quit("missing required parameter")
 
-  if runtimeId.len < 2:
-    quit("ambigous ID")
-
   asyncMain:
     let instance = await newInstance()
     let admin = await instance.getServiceAdmin("persistence", PersistenceServiceAdmin)
@@ -55,9 +55,31 @@ dispatchGen(rmCmd)
 
 proc mainObj*() =
   dispatchSubcommand({
-    "ls": () => quit(dispatchListCmd(argv, doc="Returns list of saved references.")),
-    "rm": () => quit(dispatchRmCmd(argv, doc="Forget about a saved references.")),
+    "ls": () => quit(dispatchListCmd(argv, doc="Returns list of saved objects.")),
+    "rm": () => quit(dispatchRmCmd(argv, doc="Forget about a saved object.")),
   })
 
+proc listRefCmd(runtimeId: string) =
+  if runtimeId == nil:
+    quit("missing required parameter")
+
+  asyncMain:
+    let instance = await newInstance()
+    let admin = await instance.getServiceAdmin("persistence", PersistenceServiceAdmin)
+    #let objects = await admin.listObjects
+
+    let obj = await findObjectById(admin, runtimeId)
+    let refs = await admin.listReferences(obj.service, obj.runtimeId)
+    var table: seq[seq[string]] = @[]
+
+    for reference in refs:
+      table.add(@[reference.sturdyRef.formatSturdyRef])
+
+    renderTable(table)
+
+dispatchGen(listRefCmd)
+
 proc mainRef*() =
-  discard
+  dispatchSubcommand({
+    "ls": () => quit(dispatchListRefCmd(argv, doc="Returns list of references to a given object.")),
+  })

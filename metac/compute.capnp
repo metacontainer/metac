@@ -66,6 +66,11 @@ struct ProcessDescription {
 
   envVars @4 :List(Text);
   # List of environment variables (K=V pairs).
+
+  asPid1 @5 :Bool;
+  # If true, run the process as PID 1.
+  # - only one PID 1 process can be spawned in a process envioronment
+  # - `files` must be empty for PID 1 processes
 }
 
 struct FD {

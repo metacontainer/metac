@@ -223,6 +223,17 @@ proc listObjects(self: PersistenceServiceImpl): Future[seq[PersistentObjectInfo]
       )
   return objects
 
+proc listReferences(self: PersistenceServiceImpl, serviceId: string, runtimeId: string): Future[seq[SturdyRefInfo]] {.async.} =
+  var ret: seq[SturdyRefInfo] = @[]
+  let cap = self.getHandlerImpl(serviceId).capByRuntimeId[runtimeId]
+  for sturdyRef in cap.refs:
+    let r = MetacSturdyRef(node: self.instance.nodeAddress,
+                           service: ServiceId(kind: ServiceIdKind.named, named: "persistence"),
+                           objectInfo: sturdyRef.toAnyPointer)
+    let info = SturdyRefInfo(sturdyRef: r)
+    ret.add(info)
+  return ret
+
 proc forgetObject(self: PersistenceServiceImpl, serviceName: string, runtimeId: string) {.async.} =
   await self.handlers[serviceName].capByRuntimeId[runtimeId].forget
 
@@ -281,6 +292,7 @@ proc initService(instance: ServiceInstance): PersistenceServiceImpl =
     let runtimeId = row[2]
     let handler = self.getHandlerImpl(service)
     handler.capBySturdyRef[sturdyRef] = handler.capByRuntimeId[runtimeId]
+    handler.capBySturdyRef[sturdyRef].refs.add sturdyRef
 
   return self
 

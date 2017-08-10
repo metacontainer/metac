@@ -27,7 +27,9 @@ write dropcap.so that drop caps on LD_PRELOAD
 - [ ] sshfs
 - [ ] diod
 
-* metac scope
+* GC
+** bugs
+- properly forget child references when removing entry from DB
 ** METAC_SCOPE
 creates `ResourceGroup`s
 for use in scripts

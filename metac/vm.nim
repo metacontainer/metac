@@ -16,6 +16,11 @@ type
 
 proc getMachineType(info: MachineInfo): seq[string] =
   var s: string
+  var info = info
+
+  if info == nil:
+    info = MachineInfo(`type`: MachineInfo_Type.kvm64)
+
   case info.`type`:
     of MachineInfo_Type.kvm64: s = "kvm64"
     of MachineInfo_Type.host: s = "host"
@@ -39,6 +44,9 @@ proc serialPort(self: VMImpl, index: int32): Future[Stream] {.async.}
 proc stop(self: VMImpl): Future[void] {.async.}
 proc destroy(self: VMImpl): Future[void] {.async.}
 proc wait(self: VMImpl): Future[void] {.async.}
+
+proc summary(self: VMImpl): Future[string] {.async.} =
+  return "pid=$1" % [$self.process.pid]
 
 capServerImpl(VMImpl, [VM, Persistable, Waitable])
 
@@ -92,6 +100,9 @@ proc launchVM(instance: ServiceInstance, config: LaunchConfiguration, persistenc
   defer:
     for fd in fds:
       discard close(fd)
+
+  if config.boot == nil:
+    asyncRaise "missing boot field"
 
   if config.boot.kind == LaunchConfiguration_BootKind.disk:
     if config.boot.disk != 0:

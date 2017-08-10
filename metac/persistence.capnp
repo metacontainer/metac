@@ -43,10 +43,16 @@ struct PersistentObjectInfo {
    references @0 :List(Text);
 }
 
+struct SturdyRefInfo {
+   sturdyRef @0 :Metac.MetacSturdyRef;
+}
+
 interface PersistenceServiceAdmin {
    getHandlerFor @0 (service :Metac.ServiceId) -> (handler :ServicePersistenceHandler);
 
    listObjects @1 () -> (infos :List(PersistentObjectInfo));
+
+   listReferences @3 (service :Text, runtimeId :Text) -> (infos :List(SturdyRefInfo));
 
    forgetObject @2 (service :Text, runtimeId :Text);
 }
