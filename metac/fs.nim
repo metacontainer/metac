@@ -1,4 +1,4 @@
-import xrest, metac/restcommon
+import xrest, metac/rest_common
 
 restRef FileRef:
   sctpStream("ndbConnection")

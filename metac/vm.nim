@@ -1,4 +1,4 @@
-import xrest, metac/fs, metac/restcommon
+import xrest, metac/fs, metac/rest_common, collections
 
 type
   DriveDriver* = enum
@@ -18,8 +18,8 @@ type
     memory*: int # in MiB
     vcpu*: int
 
-    bootDisk*: Optional[int]
-    bootKernel*: Optional[BootKernel]
+    bootDisk*: Option[int]
+    bootKernel*: Option[BootKernel]
     drives*: seq[Drive]
 
 restRef VMRef:
