@@ -1,22 +1,19 @@
-import xrest, metac/restcommon
+import xrest, metac/rest_common, metac/net
 
 type
   KernelInterface* = object
     name*: string
 
 restRef NetworkRef:
-  sctpConnection("packets")
+  sctpStream("packets")
 
 restRef InterfaceRef:
-  sub(network, NetworkRef)
+  sub("network", NetworkRef)
   update(KernelInterface)
   get() -> KernelInterface
   delete()
 
-restRef InterfaceCollection:
-  collection(InterfaceRef)
-  create(InterfaceRef)
-  get() -> seq[InterfaceRef]
+basicCollection(KernelInterface, InterfaceRef)
 
 restRef NetworkNamespaceRef:
-  sub(interfaces, InterfaceCollection)
+  sub(interfaces, KernelInterfaceCollection)

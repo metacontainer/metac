@@ -1,7 +1,12 @@
-import xrest, metac/fs, strutils, metac/service_common, metac/rest_common
+import xrest, metac/fs, strutils, metac/service_common, metac/rest_common, metac/flatdb, metac/fs_impl
 
 type
-  FilesystemService = object
+  MountHandler = ref object
+    info: Mount
+
+  FilesystemService = ref object
+    mountDb: FlatDB
+    mounts: seq[MountHandler]
 
 proc encodePath(path: string): string =
   assert path[0] == '/'
@@ -23,17 +28,17 @@ proc decodePath(path: string): string =
       result &= path[i]
       i += 1
 
-proc `file/item/ndbConnection`(s: FilesystemService, encodedPath: string, stream: SctpConn) {.async.} =
-  discard
+proc `file/item`(s: FilesystemService, encodedPath: string): FileImpl =
+  return FileImpl(path: decodePath(encodedPath))
 
-proc `fs/item/sftpConnection`(s: FilesystemService, encodedPath: string, stream: SctpConn) {.async.} =
-  discard
+proc `fs/item`(s: FilesystemService, encodedPath: string): FsImpl =
+  return FsImpl(path: decodePath(encodedPath))
 
 proc `mounts/get`(s: FilesystemService): Future[seq[MountRef]] {.async.} =
   discard
 
 proc `mounts/item/get`(s: FilesystemService, id: string): Future[Mount] {.async.} =
-  discard
+  return toSeq(s.mountDb.keys).mapIt(makeRef(MountRef, id))
 
 proc `mounts/item/delete`(s: FilesystemService, id: string): Future[void] {.async.} =
   discard
@@ -47,7 +52,10 @@ proc `get`(s: FilesystemService): FilesystemNamespace =
   )
 
 proc main() {.async.} =
-  let handler = restHandler(FilesystemNamespaceRef, FilesystemService())
+  let s = FilesystemService(
+    mountDb: makeFlatDB(getConfigDir() / "metac" / "mounts")
+  )
+  let handler = restHandler(FilesystemNamespaceRef, s)
   await runService("fs", handler)
 
 when isMainModule:

@@ -1,7 +1,7 @@
 import xrest, metac/fs, metac/rest_common, collections
 
 type
-  DriveDriver* = enum
+  DriveDriver* {.pure.} = enum
     virtio, ide
 
   Drive* = object
@@ -13,6 +13,13 @@ type
     initrd*: fs.FileRef
     cmdline*: string
 
+  SerialPortDriver* {.pure.} = enum
+    default, virtio
+
+  SerialPort* = object
+    driver*: SerialPortDriver
+    name*: string
+
   VM* = object
     name*: string
     memory*: int # in MiB
@@ -21,6 +28,8 @@ type
     bootDisk*: Option[int]
     bootKernel*: Option[BootKernel]
     drives*: seq[Drive]
+
+    serialPorts*: seq[SerialPort]
 
 restRef VMRef:
   get() -> VM

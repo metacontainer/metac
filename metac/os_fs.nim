@@ -1,4 +1,4 @@
-import strutils, posix, os, reactor/syscall, reactor/async, reactor/threading
+import strutils, posix, os, reactor/syscall, reactor/threading, reactor
 
 proc checkValidPath(path: string) =
   if path.len >= 1024:
@@ -65,3 +65,21 @@ proc createDirUnreadable*(path: string) =
   discard chmod(path, 0o700)
   if err < 0 and errno != EEXIST:
     raiseOSError(osLastError())
+
+proc mkdtemp(tmpl: cstring): cstring {.importc, header: "stdlib.h".}
+
+proc createUnixSocketDir*(): tuple[path: string, cleanup: proc()] =
+  var dirPath = "/tmp/metac_unix_XXXXXXXX"
+  if mkdtemp(dirPath) == nil:
+    raiseOSError(osLastError())
+
+  proc finish() =
+    removeFile(dirPath & "/socket")
+    removeDir(dirPath)
+
+  return (dirPath, finish)
+
+proc waitForFile*(path: string) {.async.} =
+  var buf: Stat
+  while stat(path.cstring, buf) != 0:
+    await asyncSleep(10)

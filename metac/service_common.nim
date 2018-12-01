@@ -1,4 +1,6 @@
-import reactor, reactor/unix, xrest, os, strutils
+import reactor, reactor/unix, xrest, os, strutils, sequtils
+
+export os, sequtils
 
 proc getRuntimePath*(): string =
   return getConfigDir() & "/metac/run/"

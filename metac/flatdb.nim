@@ -35,10 +35,23 @@ iterator keys*(db: FlatDB): string =
   for pc in walkDir(db.path, relative=true):
     let name = pc.path
     if not name.endsWith(".json"): continue
-    let ident = name[0..<6]
+    let ident = name[0..^6]
     if isKeyValid(ident):
       yield ident
 
+proc makeFlatDB*(path: string): FlatDB =
+  createDir(path)
+  return FlatDB(path: path)
+
 when isMainModule:
+  import sequtils
+
   let tempdir = getTempDir() / "flatdb-test"
   removeDir(tempdir)
+
+  let db = makeFlatDB(tempdir)
+  doAssert toSeq(db.keys) == @[]
+
+  db["foo"] = %{"bar": %5}
+  doAssert toSeq(db.keys) == @["foo"]
+  doAssert db["foo"] == %{"bar": %5}
