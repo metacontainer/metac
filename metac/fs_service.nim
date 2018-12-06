@@ -8,14 +8,6 @@ type
     mountDb: FlatDB
     mounts: seq[MountHandler]
 
-proc encodePath(path: string): string =
-  assert path[0] == '/'
-  for ch in path:
-    if ch in Digits or ch in Letters:
-      result &= ch
-    else:
-      result &= "=" & toHex(int(ch), 2)
-
 proc decodePath(path: string): string =
   var i = 0
   while i < len(path):
@@ -28,17 +20,20 @@ proc decodePath(path: string): string =
       result &= path[i]
       i += 1
 
-proc `file/item`(s: FilesystemService, encodedPath: string): FileImpl =
+proc `file/item/*`(s: FilesystemService, encodedPath: string): FileImpl =
   return FileImpl(path: decodePath(encodedPath))
 
-proc `fs/item`(s: FilesystemService, encodedPath: string): FsImpl =
+proc `fs/item/*`(s: FilesystemService, encodedPath: string): FsImpl =
   return FsImpl(path: decodePath(encodedPath))
 
 proc `mounts/get`(s: FilesystemService): Future[seq[MountRef]] {.async.} =
+  return toSeq(s.mountDb.keys).mapIt(makeRef(MountRef, it))
+
+proc `mounts/create`(s: FilesystemService, mount: Mount): Future[MountRef] {.async.} =
   discard
 
 proc `mounts/item/get`(s: FilesystemService, id: string): Future[Mount] {.async.} =
-  return toSeq(s.mountDb.keys).mapIt(makeRef(MountRef, id))
+  discard
 
 proc `mounts/item/delete`(s: FilesystemService, id: string): Future[void] {.async.} =
   discard

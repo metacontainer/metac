@@ -55,7 +55,7 @@ proc openAtSync(path: string, finalFlags: cint): cint =
 
 proc openAt*(path: string, finalFlags: cint=O_DIRECTORY): Future[cint] =
   # Open file at `path` without following symlinks.
-  assert path != nil and path.len > 0 and path[0] == '/'
+  assert path.len > 0 and path[0] == '/'
   return spawn(openAtSync(path, finalFlags))
 
 proc createDirUnreadable*(path: string) =
@@ -68,10 +68,15 @@ proc createDirUnreadable*(path: string) =
 
 proc mkdtemp(tmpl: cstring): cstring {.importc, header: "stdlib.h".}
 
-proc createUnixSocketDir*(): tuple[path: string, cleanup: proc()] =
+proc makeTempDir*(): string =
   var dirPath = "/tmp/metac_unix_XXXXXXXX"
   if mkdtemp(dirPath) == nil:
     raiseOSError(osLastError())
+
+  return dirPath
+
+proc createUnixSocketDir*(): tuple[path: string, cleanup: proc()] =
+  let dirPath = makeTempDir()
 
   proc finish() =
     removeFile(dirPath & "/socket")

@@ -1,7 +1,7 @@
-import xrest, metac/rest_common, metac/net
+import xrest, metac/rest_common, metac/net, strutils
 
 restRef FileRef:
-  sctpStream("ndbConnection")
+  sctpStream("nbdConnection")
   sctpStream("data")
 
 restRef FilesystemRef:
@@ -34,3 +34,11 @@ restRef FilesystemNamespaceRef:
   sub("mounts", MountCollection)
 
   get() -> FilesystemNamespace
+
+proc encodePath*(path: string): string =
+  assert path[0] == '/'
+  for ch in path:
+    if ch in Digits or ch in Letters:
+      result &= ch
+    else:
+      result &= "=" & toHex(int(ch), 2)

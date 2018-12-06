@@ -22,10 +22,18 @@ restRef ScreenRef:
   # A device that can display video.
   sub("feeds", VideoFeedCollection)
 
+type
+  DesktopFormat* {.pure.} = enum
+    unknown, vnc, spice
+
+  Desktop* = object
+    supportedFormats: seq[DesktopFormat]
+
 restRef DesktopRef:
-  # Desktop is a Screen + mouse/keyboard + clipboard sync
-  sctpStream("vncStream")
+  # Desktop is a Screen + mouse/keyboard + (optional) clipboard sync
+  sctpStream("desktopStream")
   sub("video", VideoFeedRef)
+  get() -> Desktop
 
 #### X11 ####
 
@@ -35,7 +43,11 @@ type
     xauthorityPath: string
     virtual: bool
 
-basicCollection(X11Desktop, DesktopRef)
+restRef X11DesktopRef:
+  sub("desktop", DesktopRef)
+  get() -> X11Desktop
+
+basicCollection(X11Desktop, X11DesktopRef)
 # You can create desktop in one of two ways:
 # - by {"virtual": true} and then reading displayId and xauthorityPath - this will use Xvncserver
 # - by {"virtual": false, "xauthorityPath": "...", "displayId": "..."} - this will use x11vnc on existing display

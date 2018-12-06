@@ -1,6 +1,6 @@
 # metac
 
-*Warning: this is rewrite of MetaContainer - it is not yet ready to use in production. Subscribe for newletter at https://metacontainer.org/*
+*Warning: this is a rewrite of MetaContainer - it is not yet ready to use in production. Subscribe for newletter at https://metacontainer.org/*
 
 MetaContainer aims to provide a common interface for sharing various types of resources, including filesystems, Ethernet networks or USB devices in a **secure way**. MetaContainer also provides compute services (container orchestration) with the ability to seamlessly attach possibly remote resources.
 

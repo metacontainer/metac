@@ -10,7 +10,7 @@ type
 proc open(self: FileImpl): Future[cint] =
   return openAt(self.path, finalFlags=O_RDWR)
 
-proc ndbConnection*(f: FileImpl, stream: SctpConn) {.async.} =
+proc nbdConnection*(f: FileImpl, stream: SctpConn, req: HttpRequest) {.async.} =
   let fd = await f.open
   setBlocking(fd)
 
@@ -18,8 +18,8 @@ proc ndbConnection*(f: FileImpl, stream: SctpConn) {.async.} =
   let (dirPath, cleanup) = createUnixSocketDir()
   let socketPath = dirPath & "/socket"
   var cmd = @["qemu-nbd",
-                 "-f", "raw",
-                 "/proc/self/fd/3", "--socket=" & socketPath]
+              "-f", "raw",
+              "/proc/self/fd/3", "--socket=" & socketPath]
 
   defer: cleanup()
 
@@ -33,7 +33,16 @@ proc ndbConnection*(f: FileImpl, stream: SctpConn) {.async.} =
 
   let sock = await connectUnix(socketPath)
   await pipe(stream, sock)
-  await process.wait
+  discard (await process.wait)
 
-proc sftpConnection*(f: FsImpl, stream: SctpConn) {.async.} =
+proc data*(f: FileImpl, stream: SctpConn, req: HttpRequest) {.async.} =
+  let fd = await f.open
+  let f = createInputFromFd(fd)
+  defer: f.recvClose
+  await pipe(f, stream)
+
+proc sftpConnection*(f: FsImpl, stream: SctpConn, req: HttpRequest) {.async.} =
+  discard
+
+when isMainModule:
   discard
