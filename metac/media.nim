@@ -5,7 +5,7 @@ type
     vnc, spice, mjpeg, h264
 
   VideoStreamInfo* = object
-    supportedFormats: seq[VideoStremaFormat]
+    supportedFormats*: seq[VideoStremaFormat]
 
 restRef VideoStreamRef:
   get() -> VideoStreamInfo

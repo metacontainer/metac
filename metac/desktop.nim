@@ -2,10 +2,10 @@ import xrest, metac/rest_common, metac/media, options
 
 type
   Rect* = object
-    x: float
-    y: float
-    w: float
-    h: float
+    x*: float
+    y*: float
+    w*: float
+    h*: float
 
   VideoFeed* = object
     rect: Rect
@@ -27,21 +27,21 @@ type
     unknown, vnc, spice
 
   Desktop* = object
-    supportedFormats: seq[DesktopFormat]
+    supportedFormats*: seq[DesktopFormat]
 
 restRef DesktopRef:
   # Desktop is a Screen + mouse/keyboard + (optional) clipboard sync
   sctpStream("desktopStream")
-  sub("video", VideoFeedRef)
+  sub("video", VideoStreamRef)
   get() -> Desktop
 
 #### X11 ####
 
 type
-  X11Desktop = object
-    displayId: string
-    xauthorityPath: string
-    virtual: bool
+  X11Desktop* = object
+    displayId*: Option[string]
+    xauthorityPath*: Option[string]
+    virtual*: bool
 
 restRef X11DesktopRef:
   sub("desktop", DesktopRef)

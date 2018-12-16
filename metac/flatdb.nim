@@ -26,10 +26,17 @@ proc pathForKey(db: FlatDB, key: string): string =
 proc `[]`*(db: FlatDB, key: string): JsonNode =
   parseJson(readFile(pathForKey(db, key)))
 
+proc contains*(db: FlatDB, key: string): bool =
+  existsFile(pathForKey(db, key))
+
 proc `[]=`*(db: FlatDB, key: string, value: JsonNode) =
   let path = pathForKey(db, key)
   writeFile(path & ".tmp", pretty(value))
   moveFile(path & ".tmp", path)
+
+proc delete*(db: FlatDB, key: string) =
+  let path = pathForKey(db, key)
+  removeFile(path)
 
 iterator keys*(db: FlatDB): string =
   for pc in walkDir(db.path, relative=true):

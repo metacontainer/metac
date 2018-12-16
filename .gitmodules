@@ -1,0 +1,3 @@
+[submodule "deps/nixwrt"]
+	path = deps/nixwrt
+	url = https://github.com/zielmicha/nixwrt
