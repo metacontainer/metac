@@ -47,4 +47,5 @@ template dispatchRequest_sctpStream*(r: HttpRequest, callPath: untyped, name: st
       fut.onErrorClose(resp.dataInput)
       asyncReturn resp
     else:
+      stderr.writeLine("invalid upgrade ($1)" % r.headers.getOrDefault("upgrade"))
       asyncReturn newHttpResponse(data="<h1>SCTP upgrade required", statusCode=400)

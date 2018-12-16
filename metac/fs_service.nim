@@ -13,7 +13,7 @@ proc decodePath(path: string): string =
   while i < len(path):
     if path[i] == '=':
       assert i + 2 < len(path)
-      result &= parseHexInt("0x" & path[i+1..i+3])
+      result &= parseHexInt("0x" & path[i+1..i+2])
       i += 3
     else:
       assert path[i] in Digits or path[i] in Letters

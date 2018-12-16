@@ -23,11 +23,11 @@ proc serviceConnect*(name: string): Future[HttpConnection] {.async.} =
 
 proc getServiceRestRef*(name: string): Future[RestRef] {.async.} =
   proc transformRequest(req: HttpRequest) =
-    let s = req.path[1..<1].split("/", 1)
+    let s = req.path[1..^1].split("/", 1)
     if s.len != 2 or s[0] != name:
-      raise newException(Exception, "misdirected request")
+      raise newException(Exception, "misdirected request (url=$1, service=$2)" % [req.path, name])
 
-    req.path = s[1]
+    req.path = "/" & s[1]
 
   let sess = createHttpSession(
     connectionFactory=(() => serviceConnect(name)),
@@ -35,7 +35,8 @@ proc getServiceRestRef*(name: string): Future[RestRef] {.async.} =
   return RestRef(sess: sess, path: "/" & name & "/")
 
 proc getServiceRestRef*[T: distinct](name: string, t: typedesc[T]): Future[T] {.async.} =
-  return T(getServiceRestRef(name))
+  let r = await getServiceRestRef(name)
+  return T(r)
 
 proc runService*(name: string, handler: RestHandler) {.async.} =
   let server = createUnixServer(getServiceSocketPath(name))
