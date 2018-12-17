@@ -34,6 +34,12 @@ proc getServiceRestRef*(name: string): Future[RestRef] {.async.} =
     transformRequest=transformRequest)
   return RestRef(sess: sess, path: "/" & name & "/")
 
+proc getRefForPath*(path: string): Future[RestRef] {.async.} =
+  assert path[0] == '/'
+  let s = path[1..^1].split('/', 1)
+  let r = await getServiceRestRef(s[0])
+  return RestRef(sess: r.sess, path: r.path & s[1])
+
 proc getServiceRestRef*[T: distinct](name: string, t: typedesc[T]): Future[T] {.async.} =
   let r = await getServiceRestRef(name)
   return T(r)

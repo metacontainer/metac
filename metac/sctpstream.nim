@@ -44,6 +44,7 @@ template dispatchRequest_sctpStream*(r: HttpRequest, callPath: untyped, name: st
     if r.headers.getOrDefault("upgrade") == "sctp":
       let (resp, sctpConn) = sctpStreamServer(r)
       let fut = pathCall(pathAppend(callPath, (name, sctpConn, r)))
+      fut.ignore
       fut.onErrorClose(resp.dataInput)
       asyncReturn resp
     else:
