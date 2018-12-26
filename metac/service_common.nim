@@ -1,4 +1,4 @@
-import reactor, reactor/unix, xrest, os, strutils, sequtils, reactor/http
+import reactor, reactor/unix, xrest, os, strutils, sequtils, reactor/http, metac/os_fs, metac/sctpstream, sctp
 
 export os, sequtils
 
@@ -40,6 +40,10 @@ proc getRefForPath*(path: string): Future[RestRef] {.async.} =
   let r = await getServiceRestRef(s[0])
   return RestRef(sess: r.sess, path: r.path & s[1])
 
+proc getRefForPath*[T: distinct](path: string, t: typedesc[T]): Future[T] {.async.} =
+  let r = await getRefForPath(path)
+  return T(r)
+
 proc getServiceRestRef*[T: distinct](name: string, t: typedesc[T]): Future[T] {.async.} =
   let r = await getServiceRestRef(name)
   return T(r)
@@ -55,3 +59,22 @@ const helpersPath {.strdefine.} = "../helpers"
 
 proc getHelperBinary*(name: string): string =
   return getAppDir() / helpersPath / name
+
+proc sctpStreamAsUnixSocket*(r: RestRef, queryString=""): Future[tuple[path: string, cleanup: proc()]] {.async.} =
+  let (dir, sockCleanup) = createUnixSocketDir()
+  let path = dir / "socket"
+  let s = createUnixServer(path)
+
+  proc handleClient(client: BytePipe) {.async.} =
+    let conn = await sctpStreamClient(r, queryString)
+    await pipe(conn, client)
+
+  s.incomingConnections.forEach(
+    proc(p: UnixConnection) = handleClient(p).ignore
+  ).ignore()
+
+  proc cleanup() =
+    sockCleanup()
+    s.close
+
+  return (path, cleanup)

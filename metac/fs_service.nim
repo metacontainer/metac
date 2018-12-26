@@ -1,4 +1,6 @@
-import xrest, metac/fs, strutils, metac/service_common, metac/rest_common, metac/flatdb, metac/fs_impl
+import xrest, metac/fs, strutils, metac/service_common, metac/rest_common, metac/flatdb, metac/fs_impl, metac/flatdb
+
+{.reorder: on.}
 
 type
   MountHandler = ref object
@@ -26,6 +28,20 @@ proc `file/item/*`(s: FilesystemService, encodedPath: string): FileImpl =
 proc `fs/item/*`(s: FilesystemService, encodedPath: string): FsImpl =
   return FsImpl(path: decodePath(encodedPath))
 
+proc doMount(m: Mount) {.async.} =
+  discard
+
+proc startMounter(s: FilesystemService, id: string) {.async.} =
+  var waitTime = 1000
+  while true:
+    if id notin s.mountDb: break
+
+    let info = s.mountDb[id].fromJson(Mount)
+
+    let r = tryAwait doMount(info)
+    if r.isError: r.error.printError
+    waitTime *= 2; waitTime = min(waitTime, 10000)
+
 proc `mounts/get`(s: FilesystemService): Future[seq[MountRef]] {.async.} =
   return toSeq(s.mountDb.keys).mapIt(makeRef(MountRef, it))
 
@@ -51,6 +67,10 @@ proc main() {.async.} =
     mountDb: makeFlatDB(getConfigDir() / "metac" / "mounts")
   )
   let handler = restHandler(FilesystemNamespaceRef, s)
+
+  for id in s.mountDb.keys:
+    startMounter(s, id).ignore
+
   await runService("fs", handler)
 
 when isMainModule:

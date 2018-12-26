@@ -19,7 +19,9 @@ proc nbdConnection*(f: FileImpl, stream: SctpConn, req: HttpRequest) {.async.} =
   let (dirPath, cleanup) = createUnixSocketDir()
   let socketPath = dirPath & "/socket"
   var cmd = @["qemu-nbd",
-              "-f", "raw",
+              "--format=raw",
+              "--discard=on", # enable discard/TRIM
+              #"--export-name=default",
               "/proc/self/fd/3", "--socket=" & socketPath]
   if readonly: cmd.add "--read-only"
 
