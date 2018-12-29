@@ -2,7 +2,7 @@ import xrest, metac/rest_common, metac/net, strutils
 
 type
   Exported* = object
-    id*: string
+    secretId*: string
     localUrl*: string
     description*: string
 
@@ -11,7 +11,3 @@ restRef ExportedRef:
   delete()
 
 basicCollection(Exported, ExportedRef)
-
-restRef RemoteService:
-  sub("exported", ExportedCollection)
-  rawRequest("remote")

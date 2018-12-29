@@ -1,7 +1,24 @@
-import metac/cli_utils, reactor, metac/desktop, metac/service_common, xrest
+import metac/cli_utils, reactor, metac/desktop, metac/service_common, xrest, collections
 
 command("metac desktop create-for-existing", proc(display: string="", xauthority="")):
-  discard
+  var display = display
+  var xauthority = xauthority
+
+  if display == "":
+    display = getenv("DISPLAY")
+
+  if xauthority == "":
+    xauthority = getenv("XAUTHORITY")
+    if xauthority == "":
+      xauthority = getenv("HOME") & "/.Xauthority"
+
+  let service = await getServiceRestRef("x11-desktop", X11DesktopCollection)
+  let r = await service.create(X11Desktop(
+    virtual: false,
+    xauthorityPath: some(xauthority),
+    displayId: some(display),
+  ))
+  echo r
 
 command("metac desktop create-virtual", proc()):
   let service = await getServiceRestRef("x11-desktop", X11DesktopCollection)

@@ -44,7 +44,7 @@ proc main*(command: string) =
   for i in 1..params.len:
     let subcommand = params[0..<i]
     if subcommand notin commands:
-      stderr.writeLine "invalid subcommand: " & subcommand
+      stderr.writeLine "invalid subcommand: " & subcommand.join(" ")
       quit(1)
 
     if not commands[subcommand].isMulticommand:

@@ -9,7 +9,7 @@ type
 
 # --- CLIENT ----
 
-proc `remote`(r: RemoteServiceImpl, req: HttpRequest): Future[HttpResponse] {.async.} =
+proc localRequest(r: RemoteServiceImpl, req: HttpRequest): Future[HttpResponse] {.async.} =
   # TODO: reuse control channel
   let id = req.splitPath[0]
   let binaryId = urlsafeBase64Decode(id)
@@ -27,6 +27,7 @@ proc `remote`(r: RemoteServiceImpl, req: HttpRequest): Future[HttpResponse] {.as
   var response = await readResponseHeaders(headersStream)
 
   if response.statusCode == 101:
+    echo response
     doAssert isSctpRequest
     doAssert response.headers["upgrade"] == "sctp"
 
@@ -39,6 +40,11 @@ proc `remote`(r: RemoteServiceImpl, req: HttpRequest): Future[HttpResponse] {.as
     pipe(readBuffersPrefixed(req.data.get), bpDataConn.output).onFinishClose(bpDataConn.output)
     pipe(bpDataConn.input, writeBuffersPrefixed(output)).onFinishClose(output)
   else:
+    # remove hop by hop headers
+    response.headers.del("connection")
+    response.headers.del("transfer-encoding")
+    response.headers.del("upgrade")
+
     response.dataInput = headersStream
 
   return response
@@ -72,6 +78,7 @@ proc safeJoinUrl(a: string, b: seq[string]): string =
 proc handleRemoteSctpRequest(r: RemoteServiceImpl, serviceConn: HttpConnection, req: HttpRequest): Future[HttpResponse] {.async.} =
   await serviceConn.sendOnlyRequest(req)
   let response = await serviceConn.readHeaders
+  doAssert response.headers["upgrade"] == "sctp"
 
   if response.statusCode != 101:
     await serviceConn.readResponseBody(response)
@@ -87,6 +94,7 @@ proc handleRemoteSctpRequest(r: RemoteServiceImpl, serviceConn: HttpConnection, 
   ).ignore # TODO: timeout
 
   response.headers["x-remote-id"] = topicId
+  response.dataInput = newConstInput("")
   return response
 
 proc handleRemoteNormalRequest(r: RemoteServiceImpl, serviceConn: HttpConnection, req: HttpRequest): Future[HttpResponse] {.async.} =
@@ -111,6 +119,7 @@ proc handleRemoteRequest(r: RemoteServiceImpl, req: HttpRequest): Future[HttpRes
     return newHttpResponse("no such remote ref", statusCode=404)
 
   let refInfo = r.db[hashId(id)].fromJson(Exported)
+  assert refInfo.secretId == id
   let fullUrl = safeJoinUrl(refInfo.localUrl, req.splitPath[1..^1])
   assert fullUrl.len > 0 and fullUrl[0] == '/'
   echo "remote request ", fullUrl
@@ -131,7 +140,7 @@ proc handleRemoteRequest(r: RemoteServiceImpl, req: HttpRequest): Future[HttpRes
 
 proc serializeResponse(r: HttpResponse): Future[string] {.async.} =
   let (i,o) = newInputOutputPair[byte](128 * 1024) # if we exceed buffer size, bad things happen
-  await writeResponse(o, r)
+  await writeResponse(o, r, close=true) # need `close=true` to avoid chunked transfer encoding
   o.sendClose
   return i.readUntilEof()
 
@@ -152,26 +161,24 @@ proc generateId(r: RemoteServiceImpl): string =
   s &= urandom(16)
   return urlsafeBase64Encode(s)
 
-proc `exported/create`(r: RemoteServiceImpl, info: Exported): Future[ExportedRef] {.async.} =
+proc `create`(r: RemoteServiceImpl, info: Exported): Future[ExportedRef] {.async.} =
   var info = info
-  info.id = r.generateId
+  info.secretId = r.generateId
+  let id = hashId(info.secretId)
 
-  r.db[hashId(info.id)] = toJson(info)
+  r.db[id] = toJson(info)
   assert info.localUrl != ""
 
-  return makeRef(ExportedRef, info.id)
+  return makeRef(ExportedRef, id)
 
-proc `exported/get`(r: RemoteServiceImpl): Future[seq[ExportedRef]] {.async.} =
-  return toSeq(r.db.keys).mapIt(makeRef(ExportedRef, r.db[it]["id"].str))
+proc `get`(r: RemoteServiceImpl): Future[seq[ExportedRef]] {.async.} =
+  return toSeq(r.db.keys).mapIt(makeRef(ExportedRef, it))
 
-proc `exported/item/get`(r: RemoteServiceImpl, id: string): Future[Exported] {.async.} =
-  return r.db[hashId(id)].fromJson(Exported)
+proc `item/get`(r: RemoteServiceImpl, id: string): Future[Exported] {.async.} =
+  return r.db[id].fromJson(Exported)
 
-proc `exported/item/delete`(r: RemoteServiceImpl, id: string) =
-  r.db.delete(hashId(id))
-
-proc `exported/item/update`(r: RemoteServiceImpl, id: string) =
-  raise newException(Exception, "operation not supported")
+proc `item/delete`(r: RemoteServiceImpl, id: string) =
+  r.db.delete(id)
 
 proc main() {.async.} =
   let bp = await defaultBackplane()
@@ -183,8 +190,8 @@ proc main() {.async.} =
   let conns = await bp.listen("metac-remote-control")
   conns.forEach(proc(conn: BackplaneConn) = handleRemoteConn(s, conn).ignore).onErrorQuit
 
-  let handler = restHandler(RemoteService, s)
-  await runService("remote", handler)
+  runService("exported", restHandler(ExportedCollection, s)).onErrorQuit
+  await runService("remote", (r) => localRequest(s, r))
 
 when isMainModule:
   main().runMain

@@ -29,7 +29,7 @@ proc sctpStreamServer*(r: HttpRequest): (HttpResponse, SctpConn) =
     output: writeBuffersPrefixed(output),
   ))
   let resp = HttpResponse(statusCode: 101, dataInput: input,
-                          headers: headerTable({"connection": "upgrade"}))
+                          headers: headerTable({"connection": "upgrade", "upgrade": "sctp"}))
 
   return (resp, sctpConn)
 
