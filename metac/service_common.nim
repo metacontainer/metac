@@ -6,6 +6,7 @@ proc getRuntimePath*(): string =
   return getConfigDir() & "/metac/run/"
 
 proc isServiceNameValid(name: string): bool =
+  if '\0' in name or name == "": return false
   for ch in name:
     if ch notin Letters + Digits + {'_', '-'}:
       return false
@@ -21,18 +22,23 @@ proc serviceConnect*(name: string): Future[HttpConnection] {.async.} =
   let s = await connectUnix(getServiceSocketPath(name))
   return newHttpConnection(s, defaultHost=name)
 
-proc getServiceRestRef*(name: string): Future[RestRef] {.async.} =
+proc getRootRestRef*(): Future[RestRef] {.async.} =
   proc transformRequest(req: HttpRequest) =
     let s = req.path[1..^1].split("/", 1)
-    if s.len != 2 or s[0] != name:
-      raise newException(Exception, "misdirected request (url=$1, service=$2)" % [req.path, name])
-
     req.path = "/" & s[1]
 
+  proc connectionFactory(req: HttpRequest): Future[HttpConnection] {.async.} =
+    let s = req.path[1..^1].split("/", 1)
+    return serviceConnect(s[0])
+
   let sess = createHttpSession(
-    connectionFactory=(() => serviceConnect(name)),
+    connectionFactory=connectionFactory,
     transformRequest=transformRequest)
-  return RestRef(sess: sess, path: "/" & name & "/")
+  return RestRef(sess: sess, path: "/")
+
+proc getServiceRestRef*(name: string): Future[RestRef] {.async.} =
+  let r = await getRootRestRef()
+  return r / name
 
 proc getRefForPath*(path: string): Future[RestRef] {.async.} =
   assert path[0] == '/'

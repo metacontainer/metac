@@ -180,7 +180,7 @@ proc `item/get`(r: RemoteServiceImpl, id: string): Future[Exported] {.async.} =
 proc `item/delete`(r: RemoteServiceImpl, id: string) =
   r.db.delete(id)
 
-proc main() {.async.} =
+proc main*() {.async.} =
   let bp = await defaultBackplane()
   let s = RemoteServiceImpl(
     db: makeFlatDB(getConfigDir() / "metac" / "remote"),

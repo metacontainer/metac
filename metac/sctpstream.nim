@@ -1,15 +1,17 @@
 import macros, xrest, sctp, collections, reactor, xrest/pathcall
 
 proc sctpStreamClient*(r: RestRef, queryString=""): Future[SctpConn] {.async.} =
-  let conn = await r.sess.makeConnection()
   var path = r.path
   if queryString != "":
     path &= "?" & queryString
 
-  await conn.sendOnlyRequest(r.sess.createRequest(
+  let req = newHttpRequest(
     "POST", path, headers=headerTable({
       "connection": "upgrade",
-      "upgrade": "sctp"})))
+      "upgrade": "sctp"}))
+  let conn = await r.sess.makeConnection(req)
+
+  await conn.sendOnlyRequest(r.sess.createRequest(req))
 
   let resp = await conn.readHeaders()
 

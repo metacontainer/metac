@@ -82,7 +82,7 @@ proc get(self: X11DesktopService): seq[X11DesktopRef] =
 proc `item/get`(self: X11DesktopService, id: string): X11Desktop =
   return self.desktops[id].info
 
-proc main() {.async.} =
+proc main*() {.async.} =
   let s = X11DesktopService(
     desktops: initTable[string, X11DesktopImpl](),
   )

@@ -33,10 +33,12 @@ proc doMount(m: Mount) {.async.} =
 
 proc startMounter(s: FilesystemService, id: string) {.async.} =
   var waitTime = 1000
+  let rootRef = await getRootRestRef()
   while true:
     if id notin s.mountDb: break
 
-    let info = s.mountDb[id].fromJson(Mount)
+    let ctx = RestRefContext(r: rootRef)
+    let info = fromJson(ctx, s.mountDb[id], Mount)
 
     let r = tryAwait doMount(info)
     if r.isError: r.error.printError
@@ -62,7 +64,7 @@ proc `get`(s: FilesystemService): FilesystemNamespace =
     rootFs: makeRef(FilesystemRef, "fs/" & encodePath("/")),
   )
 
-proc main() {.async.} =
+proc main*() {.async.} =
   let s = FilesystemService(
     mountDb: makeFlatDB(getConfigDir() / "metac" / "mounts")
   )
