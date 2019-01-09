@@ -3,6 +3,7 @@ with import ./deps/nixwrt/portable.nix;
 rec {
   tigervnc = callPackage (import ./nix/tigervnc.nix) {};
   nim = callPackage (import ./nix/nim.nix) {};
+  buildDeb = callPackage (import ./nix/deb.nix) {};
   autoconf = pkgs.autoconf;
 
   deps = (import ./deps.nix) {inherit fetchgit;};
@@ -49,4 +50,21 @@ rec {
     fixupPhase = '' '';
   });
 
+  metacDeb = buildDeb {
+    pkg = metacPortable;
+    control = writeText "control" ''Package: metac
+Version: ${metac.version}
+Section: custom
+Priority: optional
+Architecture: @arch@
+Essential: no
+Installed-Size: 1024
+Maintainer: Michał Zieliński <michal@zielinscy.org.pl>
+Description: MetaContainer - share access to your files/desktops/USB devices securely
+Depends: fuse, ipset, iptables, iproute2
+Recommends: pulseaudio
+'';
+    postinst = writeText "postinst" ''
+'';
+  };
 }
