@@ -52,8 +52,8 @@ proc runDesktop(self: X11DesktopService, desktop: X11DesktopImpl) =
 
     let xauthority = desktop.info.xauthorityPath.get
     let displayId = ":" & desktop.info.displayId.get
-    discard execProcess("xauth", @["-f", xauthority, "remove", displayId], options={poUsePath})
-    discard execProcess("xauth", @["-f", xauthority, "add", displayId, "MIT-MAGIC-COOKIE-1", hexUrandom(16)], options={poUsePath})
+    discard execProcess("xauth", args = @["-f", xauthority, "remove", displayId], options={poUsePath})
+    discard execProcess("xauth", args = @["-f", xauthority, "add", displayId, "MIT-MAGIC-COOKIE-1", hexUrandom(16)], options={poUsePath})
     desktop.serverProcess = startProcess(
       @[getHelperBinary("Xvnc"), displayId,
         "-auth", xauthority,
@@ -71,6 +71,7 @@ proc create(self: X11DesktopService, info: X11Desktop): X11DesktopRef =
   let desktop = X11DesktopImpl(info: info)
 
   self.desktops[id] = desktop
+  self.db[id] = toJson(info)
 
   self.runDesktop(desktop)
 
@@ -82,15 +83,31 @@ proc get(self: X11DesktopService): seq[X11DesktopRef] =
 proc `item/get`(self: X11DesktopService, id: string): X11Desktop =
   return self.desktops[id].info
 
+proc `item/delete`(self: X11DesktopService, id: string): X11Desktop =
+  let desktop = self.desktops[id]
+
+  for p in desktop.cleanupProcs: p()
+  desktop.serverProcess.kill
+
+  self.desktops.del id
+  self.db.delete id
+
+proc restore(self: X11DesktopService, id: string) {.async.} =
+  let info = await dbFromJson(self.db[id], X11Desktop)
+  let desktop = X11DesktopImpl(info: info)
+  self.desktops[id] = desktop
+  self.runDesktop(desktop)
+
 proc main*() {.async.} =
-  let s = X11DesktopService(
+  let self = X11DesktopService(
     desktops: initTable[string, X11DesktopImpl](),
+    db: makeFlatDB(getConfigDir() / "metac" / "desktop_x11"),
   )
 
-  #for id in s.:
-  #  startMounter(s, id).ignore
+  for id in self.db.keys:
+    self.restore(id).ignore
 
-  let handler = restHandler(X11DesktopCollection, s)
+  let handler = restHandler(X11DesktopCollection, self)
   await runService("x11-desktop", handler)
 
 when isMainModule:

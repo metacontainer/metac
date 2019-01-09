@@ -1,4 +1,4 @@
-import reactor, reactor/unix, xrest, os, strutils, sequtils, reactor/http, metac/os_fs, metac/sctpstream, sctp
+import reactor, reactor/unix, xrest, os, strutils, sequtils, reactor/http, metac/os_fs, metac/sctpstream, sctp, json
 
 export os, sequtils
 
@@ -84,3 +84,8 @@ proc sctpStreamAsUnixSocket*(r: RestRef, queryString=""): Future[tuple[path: str
     s.close
 
   return (path, cleanup)
+
+proc dbFromJson*[T](j: JsonNode, t: typedesc[T]): Future[T] {.async.} =
+  let rootRef = await getRootRestRef()
+  let ctx = RestRefContext(r: rootRef)
+  return fromJson(ctx, j, T)

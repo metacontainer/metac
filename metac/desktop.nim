@@ -46,6 +46,7 @@ type
 restRef X11DesktopRef:
   sub("desktop", DesktopRef)
   get() -> X11Desktop
+  delete()
 
 basicCollection(X11Desktop, X11DesktopRef)
 # You can create desktop in one of two ways:

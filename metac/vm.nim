@@ -1,4 +1,4 @@
-import xrest, metac/fs, metac/rest_common, collections, metac/net, metac/desktop
+import xrest, metac/fs, metac/rest_common, collections, metac/net, metac/desktop, options
 
 type
   DriveDriver* {.pure.} = enum
