@@ -1,11 +1,11 @@
 import xrest, metac/rest_common
 
 type
-  VideoStremaFormat* {.pure.} = enum
+  VideoStreamFormat* {.pure.} = enum
     vnc, spice, mjpeg, h264
 
   VideoStreamInfo* = object
-    supportedFormats*: seq[VideoStremaFormat]
+    supportedFormats*: seq[VideoStreamFormat]
 
 restRef VideoStreamRef:
   get() -> VideoStreamInfo

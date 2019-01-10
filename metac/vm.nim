@@ -1,4 +1,4 @@
-import xrest, metac/fs, metac/rest_common, collections, metac/net, metac/desktop, options
+import xrest, metac/fs, metac/rest_common, collections, metac/net, metac/desktop, options, metac/media
 
 type
   DriveDriver* {.pure.} = enum
@@ -34,18 +34,17 @@ type
     memory*: int # in MiB
     vcpu*: int
 
-    bootDisk*: Optional[int]
-    bootKernel*: Optional[BootKernel]
+    bootDisk*: Option[int]
+    bootKernel*: Option[BootKernel]
     drives*: seq[Drive]
 
     serialPorts*: seq[SerialPort]
 
-    desktop*: AfterLaunch[DesktopRef]
-
 restRef VMRef:
   get() -> VM
+  sub("desktop", DesktopRef)
   update(VM)
   delete()
   # todo: support patch(VM)
 
-basicCollection(VMRef, VM)
+basicCollection(VM, VMRef)

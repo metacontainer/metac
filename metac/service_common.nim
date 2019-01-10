@@ -55,6 +55,7 @@ proc getServiceRestRef*[T: distinct](name: string, t: typedesc[T]): Future[T] {.
   return T(r)
 
 proc runService*(name: string, handler: RestHandler) {.async.} =
+  createDir(getRuntimePath())
   let server = createUnixServer(getServiceSocketPath(name))
   await server.incomingConnections.forEach(
     proc(conn: UnixConnection) =

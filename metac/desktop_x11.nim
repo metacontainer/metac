@@ -1,4 +1,4 @@
-import xrest, metac/fs, strutils, metac/service_common, metac/rest_common, metac/flatdb, metac/desktop, tables, posix, collections, metac/os_fs, reactor/unix, metac/media, osproc, reactor
+import xrest, metac/fs, strutils, metac/service_common, metac/rest_common, metac/flatdb, metac/desktop, tables, posix, collections, metac/os_fs, reactor/unix, metac/media, osproc, reactor, metac/desktop_impl
 
 type
   X11DesktopImpl = ref object
@@ -22,22 +22,8 @@ proc makeDesktopId(): string =
 
     return $id
 
-proc `item/desktop/desktopStream`(self: X11DesktopService, id: string, stream: SctpConn, req: HttpRequest) {.async.} =
-  let format = req.getQueryParam("format")
-  if format != "vnc":
-    raise newException(Exception, "unsupported format")
-
-  let sock = await connectUnix(self.desktops[id].vncSocketPath)
-  await pipe(stream, sock)
-
-proc `item/desktop/get`(self: X11DesktopService, id: string): Desktop =
-  return Desktop(supportedFormats: @[DesktopFormat.vnc])
-
-proc `item/desktop/video/get`(self: X11DesktopService, id: string): VideoStreamInfo =
-  return VideoStreamInfo(supportedFormats: @[VideoStremaFormat.vnc])
-
-proc `item/desktop/video/videoStream`(self: X11DesktopService, id: string, stream: SctpConn, req: HttpRequest) {.async.} =
-  await `item/desktop/desktopStream`(self, id, stream, req)
+proc `item/desktop/*`(self: X11DesktopService, id: string): DesktopImpl =
+  return DesktopImpl(vncSocketPath: self.desktops[id].vncSocketPath)
 
 proc runDesktop(self: X11DesktopService, desktop: X11DesktopImpl) =
   let (socketDir, cleanup) = createUnixSocketDir()
