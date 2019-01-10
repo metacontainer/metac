@@ -3,9 +3,9 @@
   backplane = fetchgit {
     name = "backplane";
     url = "https://github.com/metacontainer/backplane";
-    rev = "7b11031e041e7e720b54499599a6bdb861dba294";
+    rev = "e901e009e33e29f09e651fcab71b2ce1ee455de6";
     fetchSubmodules = true;
-    sha256 = "0l05w6vb0hqcl87ndklzxaj2sqi7kpd8qfy5424nz5gvnvl27a2h";
+    sha256 = "1pf5m8xklybjq1afivbn335dm5mimcixq3s200znvandlfwys13n";
   };
   channelguard = fetchgit {
     name = "channelguard";
