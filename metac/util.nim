@@ -26,7 +26,7 @@ proc copyToTemp*(s: ByteStream, maxLength=100 * 1024 * 1024): Future[tuple[path:
 
   let filePath = dirPath / "data"
   let stream: SctpConn = await s.data()
-  let fd = posix.open(filePath, O_WRONLY or O_CREAT)
+  let fd = posix.open(filePath, O_WRONLY or O_CREAT, 0o666)
   let file = createOutputFromFd(fd)
 
   defer:
