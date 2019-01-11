@@ -183,7 +183,7 @@ proc `item/delete`(r: RemoteServiceImpl, id: string) =
 proc main*() {.async.} =
   let bp = await defaultBackplane()
   let s = RemoteServiceImpl(
-    db: makeFlatDB(getConfigDir() / "metac" / "remote"),
+    db: makeFlatDB(getMetacConfigDir() / "remote"),
     bp: bp,
   )
 

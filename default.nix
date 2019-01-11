@@ -16,7 +16,7 @@ rec {
 
   metac = stdenv.mkDerivation rec {
     name = "metac";
-    version = "2019.01.01.1";
+    version = "2019.01.11.1";
     buildInputs = [nim libsodium];
 
     phases = ["buildPhase" "fixupPhase"];

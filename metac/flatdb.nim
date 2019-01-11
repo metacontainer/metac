@@ -1,5 +1,5 @@
 ## Database that stores JSON objects in flat files.
-import strutils, json, collections, os
+import strutils, json, collections, os, posix
 
 type FlatDB* = ref object
   path: string
@@ -48,6 +48,7 @@ iterator keys*(db: FlatDB): string =
 
 proc makeFlatDB*(path: string): FlatDB =
   createDir(path)
+  discard chmod(path, 0o700)
   return FlatDB(path: path)
 
 when isMainModule:

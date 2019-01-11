@@ -1,6 +1,6 @@
 {stdenv, dpkg, fakeroot}:
 {pkg, control, postinst}: stdenv.mkDerivation rec {
-  name = pkg.name + ".deb";
+  name = "${pkg.name}-${pkg.version}.deb";
   buildInputs = [dpkg fakeroot];
   buildPhase = ''
 mkdir pkg

@@ -1,9 +1,18 @@
-import reactor, reactor/unix, xrest, os, strutils, sequtils, reactor/http, metac/os_fs, metac/sctpstream, sctp, json
+import reactor, reactor/unix, xrest, os, strutils, sequtils, reactor/http, metac/os_fs, metac/sctpstream, sctp, json, posix
 
 export os, sequtils
 
+proc getMetacConfigDir*(): string =
+  if getuid() == 0:
+    return "/etc/metac"
+  else:
+    return getConfigDir() / "metac"
+
 proc getRuntimePath*(): string =
-  return getConfigDir() & "/metac/run/"
+  if getuid() == 0:
+    return "/run/metac"
+  else:
+    return getMetacConfigDir() / "run"
 
 proc isServiceNameValid(name: string): bool =
   if '\0' in name or name == "": return false
