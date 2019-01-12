@@ -7,6 +7,10 @@ type
 
 proc `desktopStream`*(self: DesktopImpl, stream: SctpConn, req: HttpRequest) {.async.} =
   let format = req.getQueryParam("format")
+
+  if format == "":
+    raise newException(Exception, "format param missing")
+
   var path = ""
   if format == "vnc":
     path = self.vncSocketPath
@@ -15,7 +19,7 @@ proc `desktopStream`*(self: DesktopImpl, stream: SctpConn, req: HttpRequest) {.a
     path = self.spiceSocketPath
 
   if path == "":
-    raise newException(Exception, "unsupported format")
+    raise newException(Exception, "unsupported format ($1)" % path)
 
   let sock = await connectUnix(path)
   await pipe(stream, sock)

@@ -1,15 +1,15 @@
 {
     "backplane": {
-        "rev": "e901e009e33e29f09e651fcab71b2ce1ee455de6",
-        "sha256": "1pf5m8xklybjq1afivbn335dm5mimcixq3s200znvandlfwys13n"
+        "rev": "81fb10d68fea6f87ddbbb2f80bcbd5ad1409acb2",
+        "sha256": "1fw07qcj3dyq5l6fyscp7snkj2mqls9jv945gxmpkx8dp81x9363"
     },
     "channelguard": {
         "rev": "7d7456e6cfd5d886abd387252ab0ec88dba78b71",
         "sha256": "1555mfapb8pha9n81n25x4r86c3wkbp1rb21lphxfzfys6jv7xwd"
     },
     "cligen": {
-        "rev": "66f46632dbb72bb989fbacf728ea640f341292d4",
-        "sha256": "1r09avl1naa1mjwhsppsy980wsdwi7m84qw0r8qlm13s5c05fl3g"
+        "rev": "b1b4267122d7d1a6b34d422fe306d78bb32cc251",
+        "sha256": "0x7751a2q5dnhzsr63d1q9jnzavsxvh3lqr11ddwcmqyb6zjgc4l"
     },
     "collections": {
         "rev": "a6b3a024c95390adb6d95549471b14af9a515efc",
@@ -28,7 +28,7 @@
         "sha256": "1ymzrxb0i7fhrzrfbrvpcbbxn7qj0s9sgf2pkraq79gaaghq62z3"
     },
     "xrest": {
-        "rev": "25b78aca10c9751f9928fb5f74792e67d14c7e5e",
-        "sha256": "0a4h76m518b5ax97f7158mlmlkhyjnaq6cn0qx5cgppr9dfbdxc1"
+        "rev": "6a977ae087d4a7960a148fa55e787ccc26a7bddf",
+        "sha256": "02fg7z2qvl8c6c2krph0qhn603hx2x9l20v1kk7aj17q0k26fr9r"
     }
 }

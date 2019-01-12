@@ -38,6 +38,8 @@ proc getRootRestRef*(): Future[RestRef] {.async.} =
 
   proc connectionFactory(req: HttpRequest): Future[HttpConnection] {.async.} =
     let s = req.path[1..^1].split("/", 1)
+    if s[0] == "":
+      raise newException(ValueError, "cannot connect to root path ('/')")
     return serviceConnect(s[0])
 
   let sess = createHttpSession(
@@ -47,13 +49,17 @@ proc getRootRestRef*(): Future[RestRef] {.async.} =
 
 proc getServiceRestRef*(name: string): Future[RestRef] {.async.} =
   let r = await getRootRestRef()
+  if not isServiceNameValid(name):
+    raise newException(Exception, "invalid service name")
+
   return r / name
 
 proc getRefForPath*(path: string): Future[RestRef] {.async.} =
-  assert path[0] == '/'
-  let s = path[1..^1].split('/', 1)
-  let r = await getServiceRestRef(s[0])
-  return RestRef(sess: r.sess, path: r.path & s[1])
+  var r = await getRootRestRef()
+  for seg in path.split('/'):
+    if seg != "":
+      r = r / seg
+  return r
 
 proc getRefForPath*[T: distinct](path: string, t: typedesc[T]): Future[T] {.async.} =
   let r = await getRefForPath(path)

@@ -3,9 +3,9 @@
   backplane = fetchgit {
     name = "backplane";
     url = "https://github.com/metacontainer/backplane";
-    rev = "e901e009e33e29f09e651fcab71b2ce1ee455de6";
+    rev = "81fb10d68fea6f87ddbbb2f80bcbd5ad1409acb2";
     fetchSubmodules = true;
-    sha256 = "1pf5m8xklybjq1afivbn335dm5mimcixq3s200znvandlfwys13n";
+    sha256 = "1fw07qcj3dyq5l6fyscp7snkj2mqls9jv945gxmpkx8dp81x9363";
   };
   channelguard = fetchgit {
     name = "channelguard";
@@ -17,9 +17,9 @@
   cligen = fetchgit {
     name = "cligen";
     url = "https://github.com/metacontainer/cligen";
-    rev = "66f46632dbb72bb989fbacf728ea640f341292d4";
+    rev = "b1b4267122d7d1a6b34d422fe306d78bb32cc251";
     fetchSubmodules = true;
-    sha256 = "1r09avl1naa1mjwhsppsy980wsdwi7m84qw0r8qlm13s5c05fl3g";
+    sha256 = "0x7751a2q5dnhzsr63d1q9jnzavsxvh3lqr11ddwcmqyb6zjgc4l";
   };
   collections = fetchgit {
     name = "collections";
@@ -52,8 +52,8 @@
   xrest = fetchgit {
     name = "xrest";
     url = "https://github.com/zielmicha/xrest";
-    rev = "25b78aca10c9751f9928fb5f74792e67d14c7e5e";
+    rev = "6a977ae087d4a7960a148fa55e787ccc26a7bddf";
     fetchSubmodules = true;
-    sha256 = "0a4h76m518b5ax97f7158mlmlkhyjnaq6cn0qx5cgppr9dfbdxc1";
+    sha256 = "02fg7z2qvl8c6c2krph0qhn603hx2x9l20v1kk7aj17q0k26fr9r";
   };
 }

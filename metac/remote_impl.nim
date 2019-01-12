@@ -27,7 +27,7 @@ proc localRequest(r: RemoteServiceImpl, req: HttpRequest): Future[HttpResponse] 
   var response = await readResponseHeaders(headersStream)
 
   if response.statusCode == 101:
-    echo response
+    echo req, " ", response
     doAssert isSctpRequest
     doAssert response.headers["upgrade"] == "sctp"
 
@@ -120,9 +120,8 @@ proc handleRemoteRequest(r: RemoteServiceImpl, req: HttpRequest): Future[HttpRes
 
   let refInfo = r.db[hashId(id)].fromJson(Exported)
   assert refInfo.secretId == id
-  let fullUrl = safeJoinUrl(refInfo.localUrl, req.splitPath[1..^1])
+  let fullUrl = safeJoinUrl(refInfo.localUrl, req.splitPath[1..^1]) & req.query
   assert fullUrl.len > 0 and fullUrl[0] == '/'
-  echo "remote request ", fullUrl
   let (service, servicePath) = fullUrl[1..^1].split2("/")
 
   let serviceConn = await serviceConnect(service)
