@@ -19,19 +19,10 @@ stdenv.mkDerivation rec {
 
   inherit fontDirectories;
 
-  patchPhase = ''
-    sed -i -e '/^\$cmd \.= " -pn";/a$cmd .= " -xkbdir ${xkeyboard_config}/etc/X11/xkb";' unix/vncserver
-    fontPath=
-    for i in $fontDirectories; do
-      for j in $(find $i -name fonts.dir); do
-        addToSearchPathWithCustomDelimiter "," fontPath $(dirname $j)
-      done
-    done
-    sed -i -e '/^\$cmd \.= " -pn";/a$cmd .= " -fp '"$fontPath"'";' unix/vncserver
-  '';
-
   dontUseCmakeBuildDir = true;
 
+  # TODO: we sould probably ship xkb?
+  # TODO: also ship swrast_dri.so
   postBuild = ''
     export NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -Wno-error=int-to-pointer-cast -Wno-error=pointer-to-int-cast"
     export CXXFLAGS="$CXXFLAGS -fpermissive"
@@ -54,8 +45,8 @@ stdenv.mkDerivation rec {
         --disable-dri --disable-dri2 --disable-dri3 --enable-glx \
         --enable-install-libxf86config \
         --prefix="$out" --disable-unit-tests \
-        --with-xkb-path=${xkeyboard_config}/share/X11/xkb \
-        --with-xkb-bin-directory=${xorg.xkbcomp}/bin \
+        --with-xkb-path=/usr/share/X11/xkb \
+        --with-xkb-bin-directory=/usr/bin \
         --with-xkb-output=$out/share/X11/xkb/compiled
     make TIGERVNC_SRCDIR=`pwd`/../..
     make -C hw/vnc TIGERVNC_SRCDIR=`pwd`/../..
