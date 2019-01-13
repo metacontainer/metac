@@ -32,14 +32,20 @@ command("metac desktop ls", proc()):
   let s = await service.get
   for r in s: echo r
 
-command("metac desktop client", proc(path: string)):
+command("metac desktop client", proc(path: string, fullScreen=false, allMonitors=false)):
   let r = await getRefForPath(path)
   let stream = r / "desktopStream"
   let (path, cleanup) = await sctpStreamAsUnixSocket(stream, "format=vnc")
   defer: cleanup()
 
+  var cmd = @[getHelperBinary("vncviewer"), path, "-Shared"]
+  if fullScreen:
+    cmd.add "-FullScreen"
+  if allMonitors:
+    cmd.add "-FullScreenAllMonitors"
+
   let p = startProcess(
-    @[getHelperBinary("vncviewer"), path],
+    cmd,
     additionalFiles = processStdioFiles,
     additionalEnv = @[("LC_ALL", "C")],
   )

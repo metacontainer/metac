@@ -43,6 +43,7 @@ proc runDesktop(self: X11DesktopService, desktop: X11DesktopImpl) =
     desktop.serverProcess = startProcess(
       @[getHelperBinary("Xvnc"), displayId,
         "-auth", xauthority,
+        "-AlwaysShared",
         "-SecurityTypes", "none", "-rfbunixpath", socketDir / "socket"])
   else:
     desktop.serverProcess = startProcess(
