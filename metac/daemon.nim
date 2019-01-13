@@ -8,10 +8,10 @@ proc runDaemon(runBackplane: bool) {.async.} =
   var f: seq[Future[void]]
 
   if runBackplane:
-    removeFile(getConfigDir() & "/metac/run/backplane.socket")
+    removeFile(backplane_server.getSocketPath())
     f.add(backplane_server.main())
 
-    await waitForFile(getConfigDir() & "/metac/run/backplane.socket")
+    await waitForFile(backplane_server.getSocketPath())
 
   f.add desktop_x11.main()
   f.add remote_impl.main()
