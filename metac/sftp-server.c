@@ -62,6 +62,7 @@
 #include <sys/wait.h>
 #include <linux/capability.h>
 #include <linux/securebits.h>
+#include <sched.h>
 
 /* Our verbosity */
 static LogLevel log_level = SYSLOG_LEVEL_ERROR;
@@ -1551,6 +1552,43 @@ void drop_caps(int new_uid) {
 	set_capabilities((1 << CAP_SETFCAP) | (1 << CAP_FSETID) | (1 << CAP_FOWNER) | (1 << CAP_CHOWN) | (1 << CAP_SETUID) | (1 << CAP_SETGID) | (1 << CAP_DAC_OVERRIDE) | (1 << CAP_DAC_READ_SEARCH));
 }
 
+void write_to_file(const char* path, const char* data) {
+	int fd = open(path, O_WRONLY);
+	if (fd < 0)
+		fatal("failed to open userns file %s", path);
+
+	int r = write(fd, data, strlen(data));
+	close(fd);
+
+	if (r != strlen(data))
+		fatal("failed to write to userns file");
+}
+
+void enter_userns() {
+	int original_uid = getuid();
+
+	if (unshare(CLONE_NEWUSER) != 0) {
+		fatal("failed to unshare user namespace, please run 'sysctl -w kernel.unprivileged_userns_clone=1'");
+	}
+
+	int pid = fork();
+	if (pid < 0) {
+		fatal("fork failed");
+	}
+
+	if (pid != 0) {
+		wait(NULL);
+		_exit(0);
+	} else {
+		char mapping[100];
+		sprintf(mapping, "0 %d 1", original_uid);
+
+		write_to_file("/proc/self/setgroups", "deny");
+		write_to_file("/proc/self/uid_map", mapping);
+		write_to_file("/proc/self/gid_map", mapping);
+	}
+}
+
 // ----
 
 int
@@ -1654,12 +1692,15 @@ sftp_server_main(int argc, char **argv, struct passwd* pass)
 	 * imply arbitrary code execution access that will break
 	 * restricted configurations.
 	 */
-	platform_disable_tracing(1);	/* strict */
+	//platform_disable_tracing(1);	/* strict */
 
 	/* Drop any fine-grained privileges we don't need */
 	platform_pledge_sftp_server();
 
 	if (chroot_fd != -1) {
+		if (getuid() != 0)
+			enter_userns();
+
 		if (fchdir(chroot_fd) < 0)
 			fatal("can't chdir to chroot fd");
 		if (chroot(".") < 0)

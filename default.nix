@@ -13,6 +13,15 @@ rec {
     (path: type: (lib.hasSuffix ".nim" path))
     ./metac;
 
+  sftpServer = pkgs.openssh.overrideDerivation (attrs: rec {
+    name = "sftp-server";
+    buildInputs = attrs.buildInputs ++ [stdenv.glibc.static];
+    # (???) TODO: do dynamic linking (patchelf fails on PIC executables)
+    buildPhase = ''make CFLAGS='-fPIC' libssh.a ./openbsd-compat/libopenbsd-compat.a
+gcc -fPIC -ftrapv -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=600 -D_BSD_SOURCE -o sftp-server ${./metac/sftp-server.c} sftp-common.c -Lopenbsd-compat -L. -I.  -fstack-protector-strong -lssh -lopenbsd-compat  -Wl,--gc-sections'';
+    installPhase = ''mkdir -p $out/bin; cp sftp-server $out/bin'';
+  });
+
   SDL2 = callPackage (import "${pkgs.repo}/pkgs/development/libraries/SDL2") {
     inherit (darwin.apple_sdk.frameworks) AudioUnit Cocoa CoreAudio CoreServices ForceFeedback OpenGL;
     openglSupport = false;
