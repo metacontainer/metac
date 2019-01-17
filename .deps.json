@@ -1,7 +1,7 @@
 {
     "backplane": {
-        "rev": "81fb10d68fea6f87ddbbb2f80bcbd5ad1409acb2",
-        "sha256": "1fw07qcj3dyq5l6fyscp7snkj2mqls9jv945gxmpkx8dp81x9363"
+        "rev": "5d583bb941d48873908756aad0db5fda1fc79002",
+        "sha256": "0dyb7632v0w2r10y6hmnhmhfmzp99h2yi5hivjim72598rgwcdab"
     },
     "channelguard": {
         "rev": "7d7456e6cfd5d886abd387252ab0ec88dba78b71",
@@ -16,19 +16,19 @@
         "sha256": "0xrzgr51dw1hjcnksvb1j8bkx4sw9v3bgvgmw726qapnd1kjck1k"
     },
     "reactor": {
-        "rev": "698ac0645e12f3cac34ba2523248d7d2781f613a",
-        "sha256": "0cwqmac77lsmpl5znwm2jap4gc2f6zgyjjz5l54mp669jcchvvyx"
+        "rev": "9c0ed7b1db16256db301ebe248cf40d965c5dd87",
+        "sha256": "0yh0ckvx30vqbj4p6zsx8wdhfpq8l83jl2h036w383vaxw8wklxj"
     },
     "sctp": {
-        "rev": "fe0438d989b1d6fa12ac0a8bd9eb9ac9699b3b1b",
-        "sha256": "10db9zv1p26qq6myqc3d7ldbwisfa8rr162g6j6dbw4349adjxa9"
+        "rev": "45c042002bf92fa972eba039b64e665faa2512ef",
+        "sha256": "1n54cf65bzhg441inl07v79ps3vqh1563xqjs6yln152228d7x8a"
     },
     "sodium": {
         "rev": "e1c88906d5958ffe56ee2590d34fdc8b2f3a96f5",
         "sha256": "1ymzrxb0i7fhrzrfbrvpcbbxn7qj0s9sgf2pkraq79gaaghq62z3"
     },
     "xrest": {
-        "rev": "6a977ae087d4a7960a148fa55e787ccc26a7bddf",
-        "sha256": "02fg7z2qvl8c6c2krph0qhn603hx2x9l20v1kk7aj17q0k26fr9r"
+        "rev": "4bf8ba8605e14410087c7054e2ade75e8f4c6e64",
+        "sha256": "1xzr4hlaikcs4k69gfm68sfm06varpj89pkprkzd7v0bn5is7wsj"
     }
 }

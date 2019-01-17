@@ -4,7 +4,6 @@ rec {
   tigervnc = callPackage (import ./nix/tigervnc.nix) {};
   nim = callPackage (import ./nix/nim.nix) {};
   buildDeb = callPackage (import ./nix/deb.nix) {};
-  autoconf = pkgs.autoconf;
 
   deps = (import ./deps.nix) {inherit fetchgit;};
   nimArgsBase = toString (map (x: "--path:${toString x}") (builtins.attrValues deps));
@@ -14,10 +13,20 @@ rec {
     (path: type: (lib.hasSuffix ".nim" path))
     ./metac;
 
+  SDL2 = callPackage (import "${pkgs.repo}/pkgs/development/libraries/SDL2") {
+    inherit (darwin.apple_sdk.frameworks) AudioUnit Cocoa CoreAudio CoreServices ForceFeedback OpenGL;
+    openglSupport = false;
+    alsaSupport = true;
+    x11Support = false;
+    # waylandSupport = false;
+    udevSupport = false;
+    pulseaudioSupport = false;
+  };
+
   metac = stdenv.mkDerivation rec {
     name = "metac";
     version = "2019.01.11.1";
-    buildInputs = [nim libsodium];
+    buildInputs = [nim libsodium SDL2 gtk3 libopus];
 
     phases = ["buildPhase" "fixupPhase"];
 

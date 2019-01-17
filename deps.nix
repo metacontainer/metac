@@ -3,9 +3,9 @@
   backplane = fetchgit {
     name = "backplane";
     url = "https://github.com/metacontainer/backplane";
-    rev = "81fb10d68fea6f87ddbbb2f80bcbd5ad1409acb2";
+    rev = "5d583bb941d48873908756aad0db5fda1fc79002";
     fetchSubmodules = true;
-    sha256 = "1fw07qcj3dyq5l6fyscp7snkj2mqls9jv945gxmpkx8dp81x9363";
+    sha256 = "0dyb7632v0w2r10y6hmnhmhfmzp99h2yi5hivjim72598rgwcdab";
   };
   channelguard = fetchgit {
     name = "channelguard";
@@ -31,16 +31,16 @@
   reactor = fetchgit {
     name = "reactor";
     url = "https://github.com/zielmicha/reactor.nim";
-    rev = "698ac0645e12f3cac34ba2523248d7d2781f613a";
+    rev = "9c0ed7b1db16256db301ebe248cf40d965c5dd87";
     fetchSubmodules = true;
-    sha256 = "0cwqmac77lsmpl5znwm2jap4gc2f6zgyjjz5l54mp669jcchvvyx";
+    sha256 = "0yh0ckvx30vqbj4p6zsx8wdhfpq8l83jl2h036w383vaxw8wklxj";
   };
   sctp = fetchgit {
     name = "sctp";
     url = "https://github.com/metacontainer/sctp.nim";
-    rev = "fe0438d989b1d6fa12ac0a8bd9eb9ac9699b3b1b";
+    rev = "45c042002bf92fa972eba039b64e665faa2512ef";
     fetchSubmodules = true;
-    sha256 = "10db9zv1p26qq6myqc3d7ldbwisfa8rr162g6j6dbw4349adjxa9";
+    sha256 = "1n54cf65bzhg441inl07v79ps3vqh1563xqjs6yln152228d7x8a";
   };
   sodium = fetchgit {
     name = "sodium";
@@ -52,8 +52,8 @@
   xrest = fetchgit {
     name = "xrest";
     url = "https://github.com/zielmicha/xrest";
-    rev = "6a977ae087d4a7960a148fa55e787ccc26a7bddf";
+    rev = "4bf8ba8605e14410087c7054e2ade75e8f4c6e64";
     fetchSubmodules = true;
-    sha256 = "02fg7z2qvl8c6c2krph0qhn603hx2x9l20v1kk7aj17q0k26fr9r";
+    sha256 = "1xzr4hlaikcs4k69gfm68sfm06varpj89pkprkzd7v0bn5is7wsj";
   };
 }

@@ -2,7 +2,7 @@ import reactor, metac/cli_utils, strformat, os, posix, metac/os_fs
 import backplane_server
 
 
-import metac/desktop_x11, metac/remote_impl, metac/fs_service, metac/vm_service
+import metac/desktop_x11, metac/remote_impl, metac/fs_service, metac/vm_service, metac/audio_service
 
 proc runDaemon(runBackplane: bool) {.async.} =
   var f: seq[Future[void]]
@@ -17,6 +17,7 @@ proc runDaemon(runBackplane: bool) {.async.} =
   f.add remote_impl.main()
   f.add fs_service.main()
   f.add vm_service.main()
+  f.add audio_service.main()
 
   for fut in f: fut.onErrorQuit
 
