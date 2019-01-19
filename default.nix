@@ -4,6 +4,7 @@ rec {
   tigervnc = callPackage (import ./nix/tigervnc.nix) {};
   nim = callPackage (import ./nix/nim.nix) {};
   buildDeb = callPackage (import ./nix/deb.nix) {};
+  sshfsFuse = pkgs.sshfsFuse;
 
   deps = (import ./deps.nix) {inherit fetchgit;};
   nimArgsBase = toString (map (x: "--path:${toString x}") (builtins.attrValues deps));
@@ -57,6 +58,8 @@ gcc -fPIC -ftrapv -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=600 -D_BSD_SOURCE -o sftp-se
       mkdir -p $out/bin
       cp ${metac}/bin/* $out/bin
       cp ${tigervnc}/bin/* $out/bin
+      cp ${sftpServer}/bin/* $out/bin
+      cp ${sshfsFuse}/bin/sshfs $out/bin
     '';
   };
 

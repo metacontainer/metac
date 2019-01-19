@@ -23,7 +23,7 @@ proc isServiceNameValid(name: string): bool =
 
 proc getServiceSocketPath*(name: string): string =
   if not isServiceNameValid(name):
-    raise newException(Exception, "invalid service name")
+    raise newException(Exception, "invalid service name ($1)" % name)
 
   return getRuntimePath() & "/service-" & name & ".socket"
 
@@ -101,7 +101,24 @@ proc sctpStreamAsUnixSocket*(r: RestRef, queryString=""): Future[tuple[path: str
 
   return (path, cleanup)
 
+proc pipeStdio*(conn: SctpConn, process: Process) {.async.} =
+  await zipVoid(@[
+    pipe(conn, process.files[0].output, close=true),
+    pipe(process.files[1].input, conn, close=true)
+  ])
+
 proc dbFromJson*[T](j: JsonNode, t: typedesc[T]): Future[T] {.async.} =
   let rootRef = await getRootRestRef()
   let ctx = RestRefContext(r: rootRef)
   return fromJson(ctx, j, T)
+
+proc expandResourcePath*(path: string): string =
+  # contains some convenience aliases
+  if path.startswith("file:"):
+    return "/fs/file/" & urlEncode(absolutePath(path[5..^1])) & "/"
+  elif path.startswith("fs:"):
+    return "/fs/fs/" & urlEncode(absolutePath(path[3..^1])) & "/"
+  elif not path.startswith("/"):
+    raise newException(Exception, "resource path ($1) doesn't start with '/'" % path)
+  else:
+    return path

@@ -6,3 +6,5 @@ nimcache
 !LICENSE
 nimcache/
 /nimenv.local
+
+/helpers/

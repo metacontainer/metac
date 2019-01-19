@@ -29,16 +29,12 @@ restRef MountRef:
 basicCollection(Mount, MountRef)
 
 restRef FilesystemNamespaceRef:
-  sub("file", FileCollection) # internal
-  sub("fs", FilesystemCollection) # internal
+  sub("file", FileCollection)
+  sub("fs", FilesystemCollection)
   sub("mounts", MountCollection)
 
   get() -> FilesystemNamespace
 
 proc encodePath*(path: string): string =
   assert path[0] == '/'
-  for ch in path:
-    if ch in Digits or ch in Letters:
-      result &= ch
-    else:
-      result &= "=" & toHex(int(ch), 2)
+  return urlEncode(path)

@@ -45,10 +45,40 @@ proc data*(f: FileImpl, stream: SctpConn, req: HttpRequest) {.async.} =
   let f = createInputFromFd(fd)
   await pipe(f, stream)
 
-  await asyncSleep(2000) # TODO: we need sctp_drain on something
+  await asyncSleep(2000) # TODO: we need sctp_drain or something
 
-proc sftpConnection*(f: FsImpl, stream: SctpConn, req: HttpRequest) {.async.} =
-  discard
+proc sftpConnection*(f: FsImpl, conn: SctpConn, req: HttpRequest) {.async.} =
+  let dirFd = await openAt(f.path)
+  defer: discard close(dirFd)
+  let process = startProcess(
+    @[getHelperBinary("sftp-server"),
+      "-e", # stderr instead of syslog
+      "-C", "4", # chroot to
+      #"-U", $(fs.info.uid), # setuid
+    ],
+    pipeFiles=[0.cint, 1.cint], additionalFiles=[(2.cint, 2.cint),(4.cint, dirFd)])
+
+  await pipeStdio(conn, process)
+
+proc doMount*(f: FilesystemRef, path: string) {.async.} =
+  assert path[0] == '/'
+
+  let conn = await f.sftpConnection
+
+  var opt = "slave"
+  # if getuid() == 0:
+  #   opt &= ",allow_other,default_permissions"
+  # if info.exclusive:
+  #   opt &= ",kernel_cache,entry_timeout=1000000,attr_timeout=1000000,cache_timeout=1000000"
+
+  let process = startProcess(@[getHelperBinary("sshfs"),
+                               "-f", # foreground
+                               "-o", opt,
+                               "metacfs:", path],
+                             additionalFiles= @[(2.cint, 2.cint)],
+                             pipeFiles= @[0.cint, 1.cint])
+
+  await pipeStdio(conn, process)
 
 when isMainModule:
   discard

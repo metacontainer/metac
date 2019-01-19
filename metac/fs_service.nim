@@ -11,16 +11,8 @@ type
     mounts: seq[MountHandler]
 
 proc decodePath(path: string): string =
-  var i = 0
-  while i < len(path):
-    if path[i] == '=':
-      assert i + 2 < len(path)
-      result &= char(parseHexInt("0x" & path[i+1..i+2]))
-      i += 3
-    else:
-      assert path[i] in Digits or path[i] in Letters
-      result &= path[i]
-      i += 1
+  result = urlDecode(path)
+  assert result[0] == '/'
 
 proc `file/item/*`(s: FilesystemService, encodedPath: string): FileImpl =
   return FileImpl(path: decodePath(encodedPath))

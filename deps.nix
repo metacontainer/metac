@@ -31,16 +31,16 @@
   reactor = fetchgit {
     name = "reactor";
     url = "https://github.com/zielmicha/reactor.nim";
-    rev = "9c0ed7b1db16256db301ebe248cf40d965c5dd87";
+    rev = "96976e023f2fba66f9ae947d0d193d7a1b10867f";
     fetchSubmodules = true;
-    sha256 = "0yh0ckvx30vqbj4p6zsx8wdhfpq8l83jl2h036w383vaxw8wklxj";
+    sha256 = "14fav8r80bs5lilvrx1cp3yl7gydx3zl7h7ajs73i4l01fs3y5xx";
   };
   sctp = fetchgit {
     name = "sctp";
     url = "https://github.com/metacontainer/sctp.nim";
-    rev = "45c042002bf92fa972eba039b64e665faa2512ef";
+    rev = "d207c3ec1485252a25886cde6075cadaeae5d5de";
     fetchSubmodules = true;
-    sha256 = "1n54cf65bzhg441inl07v79ps3vqh1563xqjs6yln152228d7x8a";
+    sha256 = "13xlhj2wf85pvh20kpcgbhh70cjmywdiyglypq5a07c52cy18m8a";
   };
   sodium = fetchgit {
     name = "sodium";

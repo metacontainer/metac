@@ -7,13 +7,13 @@ type
 restRef NetworkRef:
   sctpStream("packets")
 
-restRef InterfaceRef:
+restRef KernelInterfaceRef:
   sub("network", NetworkRef)
   update(KernelInterface)
   get() -> KernelInterface
   delete()
 
-basicCollection(KernelInterface, InterfaceRef)
+basicCollection(KernelInterface, KernelInterfaceRef)
 
 restRef NetworkNamespaceRef:
   sub(interfaces, KernelInterfaceCollection)

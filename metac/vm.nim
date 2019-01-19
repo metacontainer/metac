@@ -45,6 +45,6 @@ restRef VMRef:
   sub("desktop", DesktopRef)
   update(VM)
   delete()
-  # todo: support patch(VM)
+  # todo: support patch(VMPatch)
 
 basicCollection(VM, VMRef)

@@ -8,6 +8,7 @@ import metac/desktop_cli
 import metac/remote_cli
 import metac/vm_cli
 import metac/audio_cli
+import metac/fs_cli
 
 when isMainModule:
   try:
