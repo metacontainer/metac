@@ -1,10 +1,18 @@
 import xrest, metac/rest_common, metac/net, strutils
 
+type
+  Filesystem* = object
+    path: string
+
+  File* = object
+    path: string
+
 restRef FileRef:
   sctpStream("nbdConnection")
   sctpStream("data")
 
 restRef FilesystemRef:
+  get() -> Filesystem
   sctpStream("sftpConnection")
 
 restRef FileCollection:

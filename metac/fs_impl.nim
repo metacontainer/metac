@@ -47,6 +47,9 @@ proc data*(f: FileImpl, stream: SctpConn, req: HttpRequest) {.async.} =
 
   await asyncSleep(2000) # TODO: we need sctp_drain or something
 
+proc get*(f: FsImpl): Filesystem {.async.} =
+  return Filesystem(path: f.path)
+
 proc sftpConnection*(f: FsImpl, conn: SctpConn, req: HttpRequest) {.async.} =
   let dirFd = await openAt(f.path)
   defer: discard close(dirFd)

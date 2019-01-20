@@ -10,6 +10,8 @@ import metac/vm_cli
 import metac/audio_cli
 import metac/fs_cli
 
+import metac/web_proxy
+
 when isMainModule:
   try:
     cli_utils.main("metac")

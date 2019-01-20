@@ -31,7 +31,7 @@ proc serviceConnect*(name: string): Future[HttpConnection] {.async.} =
   let s = await connectUnix(getServiceSocketPath(name))
   return newHttpConnection(s, defaultHost=name)
 
-proc getRootRestRef*(): Future[RestRef] {.async.} =
+proc getRootRestRef*(): RestRef =
   proc transformRequest(req: HttpRequest) =
     let s = req.path[1..^1].split("/", 1)
     req.path = "/" & s[1]
@@ -48,14 +48,14 @@ proc getRootRestRef*(): Future[RestRef] {.async.} =
   return RestRef(sess: sess, path: "/")
 
 proc getServiceRestRef*(name: string): Future[RestRef] {.async.} =
-  let r = await getRootRestRef()
+  let r = getRootRestRef()
   if not isServiceNameValid(name):
     raise newException(Exception, "invalid service name")
 
   return r / name
 
 proc getRefForPath*(path: string): Future[RestRef] {.async.} =
-  var r = await getRootRestRef()
+  var r = getRootRestRef()
   for seg in path.split('/'):
     if seg != "":
       r = r / seg
@@ -108,7 +108,7 @@ proc pipeStdio*(conn: SctpConn, process: Process) {.async.} =
   ])
 
 proc dbFromJson*[T](j: JsonNode, t: typedesc[T]): Future[T] {.async.} =
-  let rootRef = await getRootRestRef()
+  let rootRef = getRootRestRef()
   let ctx = RestRefContext(r: rootRef)
   return fromJson(ctx, j, T)
 

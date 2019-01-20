@@ -33,6 +33,31 @@ gcc -fPIC -ftrapv -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=600 -D_BSD_SOURCE -o sftp-se
     pulseaudioSupport = false;
   };
 
+  webui_node_modules = fetchzip {
+    url = "https://cdn.atomshare.net/012c6414154eeb78c99ea7382c50980dc44fb204/node_modules.tar.xz";
+    name = "node_modules";
+    sha256 = "1hk0q3hsrymd77x40dmvv4qmr8xmqv76s6kd1nmhp13jrs3bg0r7";
+  };
+
+  webui = stdenv.mkDerivation rec {
+    name = "metac";
+
+    buildInputs = [nodejs];
+    phases = ["buildPhase"];
+
+    buildPhase = ''
+    cp ${./webui/tsconfig.json} tsconfig.json
+    cp ${./webui/webpack.config.js} webpack.config.js
+    cp -r ${./webui/src} src
+    cp -r ${./webui/node_modules}/ node_modules
+    node ./node_modules/.bin/webpack --mode production
+    mkdir -p $out/share/webui
+    cp node_modules/react/umd/react.production.min.js $out/share/webui/react.min.js
+    cp node_modules/react-dom/umd/react-dom.production.min.js $out/share/webui/react-dom.min.js
+    cp dist/index.js{,.map} $out/share/webui/
+    '';
+  };
+
   metac = stdenv.mkDerivation rec {
     name = "metac";
     version = "2019.01.11.1";
@@ -45,7 +70,7 @@ gcc -fPIC -ftrapv -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=600 -D_BSD_SOURCE -o sftp-se
     cp ${./config.nims} config.nims
     touch metac.nimble
     export XDG_CACHE_HOME=$PWD/cache
-    nim c -d:release -d:helpersPath=. --path:. ${nimArgs} --out:$out/bin/metac metac/cli.nim'';
+    nim c -d:release -d:helpersPath=. -d:webuiPath=../../share/webui --path:. ${nimArgs} --out:$out/bin/metac metac/cli.nim'';
   };
 
   metacWithDeps = stdenv.mkDerivation rec {
@@ -55,11 +80,12 @@ gcc -fPIC -ftrapv -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=600 -D_BSD_SOURCE -o sftp-se
     phases = ["installPhase"];
 
     installPhase = ''
-      mkdir -p $out/bin
+      mkdir -p $out/bin $out/share
       cp ${metac}/bin/* $out/bin
       cp ${tigervnc}/bin/* $out/bin
       cp ${sftpServer}/bin/* $out/bin
       cp ${sshfsFuse}/bin/sshfs $out/bin
+      cp -r ${webui}/share/webui $out/share/webui
     '';
   };
 
