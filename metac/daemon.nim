@@ -3,6 +3,7 @@ import backplane_server
 
 
 import metac/desktop_x11, metac/remote_impl, metac/fs_service, metac/vm_service, metac/audio_service
+import metac/web_proxy
 
 proc runDaemon(runBackplane: bool) {.async.} =
   var f: seq[Future[void]]
@@ -18,6 +19,7 @@ proc runDaemon(runBackplane: bool) {.async.} =
   f.add fs_service.main()
   f.add vm_service.main()
   f.add audio_service.main()
+  f.add web_proxy.main()
 
   for fut in f: fut.onErrorQuit
 

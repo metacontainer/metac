@@ -114,7 +114,7 @@ command("metac webui", proc()):
   let config = parseJson(readFile(defaultConfigPath())).fromJson(WebProxyConfig)
   let url = fmt"http://localhost:{config.port}/?token={config.token}"
   echo fmt"Opening URL {url} in browser..."
-  discard execShellCmd("x-www-browser {quoteShell(url)}")
+  discard execShellCmd(fmt"x-www-browser {quoteShell(url)}")
 
 when isMainModule:
   main().runMain

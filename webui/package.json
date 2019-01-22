@@ -14,7 +14,8 @@
     "@types/react-router-dom": "^4.3.1",
     "react": "^16.7.0",
     "react-dom": "^16.7.0",
-    "react-router-dom": "^4.3.1"
+    "react-router-dom": "^4.3.1",
+    "react-vnc-display": "^1.1.0"
   },
   "devDependencies": {
     "awesome-typescript-loader": "^5.2.1",

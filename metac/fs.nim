@@ -2,10 +2,10 @@ import xrest, metac/rest_common, metac/net, strutils
 
 type
   Filesystem* = object
-    path: string
+    path*: string
 
   File* = object
-    path: string
+    path*: string
 
 restRef FileRef:
   sctpStream("nbdConnection")
