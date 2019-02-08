@@ -1,4 +1,4 @@
-import macros, xrest, sctp, collections, reactor, xrest/pathcall
+import macros, xrest, sctp, collections, reactor, xrest/pathcall, reactor/http/websocket
 
 proc sctpStreamClient*(r: RestRef, queryString=""): Future[SctpConn] {.async.} =
   var path = r.path
@@ -45,6 +45,7 @@ template dispatchRequest_sctpStream*(r: HttpRequest, callPath: untyped, name: st
   if r.splitPath.len > 0 and r.splitPath[0] == name:
     if r.headers.getOrDefault("upgrade") == "sctp":
       let (resp, sctpConn) = sctpStreamServer(r)
+
       let fut = pathCall(pathAppend(callPath, (name, sctpConn, r)))
       fut.ignore
       fut.onErrorClose(resp.dataInput)
@@ -52,3 +53,48 @@ template dispatchRequest_sctpStream*(r: HttpRequest, callPath: untyped, name: st
     else:
       stderr.writeLine("invalid upgrade ($1)" % r.headers.getOrDefault("upgrade"))
       asyncReturn newHttpResponse(data="<h1>SCTP upgrade required", statusCode=400)
+
+proc wrapSctpWebsocket*(handler: RestHandler, req: HttpRequest): Future[HttpResponse] {.async.} =
+   let newReq = newHttpRequest(
+     "POST", req.path, headers=headerTable({
+       "connection": "upgrade",
+       "upgrade": "sctp"}))
+   let (input, output) = newInputOutputPair[byte]()
+   newReq.data = some(input)
+   let resp = await handler(newReq)
+
+   if resp.statusCode != 101:
+    return resp
+
+   let sctpConn = newSctpConn(Pipe[Buffer](
+     input: readBuffersPrefixed(resp.dataInput),
+     output: writeBuffersPrefixed(output),
+   ))
+
+   proc pipeIn(conn: WebsocketConnection) {.async.} =
+     defer:
+       conn.close
+       sctpConn.close
+
+     while true:
+       let msg = await conn.readMessage
+       await sctpConn.sctpPackets.output.send(SctpPacket(data: msg.data))
+
+   proc pipeOut(conn: WebsocketConnection) {.async.} =
+     defer:
+       conn.close
+       sctpConn.close
+
+     asyncFor packet in sctpConn.sctpPackets.input:
+       await conn.writeMessage(WebsocketMessage(
+         kind: WebsocketMessageKind.binary, data: packet.data))
+
+   let wsResp = await websocketServerCallback(
+     proc(r: HttpRequest, conn: WebsocketConnection): Future[void] =
+       return zipVoid(@[
+         pipeIn(conn),
+         pipeOut(conn)
+       ])
+   )(req)
+   wsResp.headers["Sec-WebSocket-Protocol"] = "binary"
+   return wsResp

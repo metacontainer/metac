@@ -1,4 +1,4 @@
-import reactor, reactor/unix, xrest, os, strutils, sequtils, reactor/http, metac/os_fs, metac/sctpstream, sctp, json, posix
+import reactor, reactor/unix, xrest, os, strutils, sequtils, reactor/http, metac/os_fs, metac/sctpstream, sctp, json, posix, collections
 
 export os, sequtils
 
@@ -69,12 +69,19 @@ proc getServiceRestRef*[T: distinct](name: string, t: typedesc[T]): Future[T] {.
   let r = await getServiceRestRef(name)
   return T(r)
 
+proc serviceHandlerWrapper(handler: RestHandler, req: HttpRequest): Future[HttpResponse] {.async.} =
+  if req.headers.getOrDefault("upgrade").toLowerAscii == "websocket":
+    # WebSocket<->SCTP bridge for better compat with non-Nim clients
+    return wrapSctpWebsocket(handler, req)
+  else:
+    return handler(req)
+
 proc runService*(name: string, handler: RestHandler) {.async.} =
   createDir(getRuntimePath())
   let server = createUnixServer(getServiceSocketPath(name))
   await server.incomingConnections.forEach(
     proc(conn: UnixConnection) =
-      runHttpServer(conn, handler).ignore
+      runHttpServer(conn, proc(r: HttpRequest): auto = serviceHandlerWrapper(handler, r)).ignore
   )
 
 const helpersPath {.strdefine.} = "../helpers"

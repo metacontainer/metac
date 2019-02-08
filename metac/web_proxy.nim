@@ -38,12 +38,16 @@ proc proxyRequest(req: HttpRequest): Future[HttpResponse] {.async.} =
   let sess = getRootRestRef().sess
   let newReq = withPathSegmentSkipped(req)
   newReq.headers = headerTable([])
-  for k in ["content-type"]:
+  for k in ["content-type", "upgrade", "sec-websocket-key"]:
     if k in req.headers: newReq.headers[k] = req.headers[k]
 
+  if "upgrade" in req.headers.getOrDefault("connection").toLowerAscii.split(", "):
+    newReq.headers["connection"] = "upgrade"
+
   let conn = await sess.makeConnection(newReq)
-  # TODO: handle SCTP
+  echo "A_req: ", newReq
   let resp = await conn.request(sess.createRequest(newReq))
+  echo "A_resp: ", resp
   resp.headers["x-frame-options"] = "deny"
   resp.headers["content-security-policy"] = "default-src 'none'"
   return resp
@@ -81,8 +85,8 @@ proc webproxyHandler(config: WebProxyConfig, req: HttpRequest): Future[HttpRespo
       statusCode=403)
 
   if req.path.startswith("/api/"):
-    if req.httpMethod != "GET":
-      if req.headers.getOrDefault("origin") != (fmt"localhost:{config.port}"):
+    if req.httpMethod != "GET" or req.headers.getOrDefault("origin") != "":
+      if req.headers.getOrDefault("origin") != (fmt"http://localhost:{config.port}"):
         return newHttpResponse("<h1>Invalid origin", statusCode=403)
 
     return proxyRequest(req)
