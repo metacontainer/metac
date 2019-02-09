@@ -24,10 +24,17 @@ restRef FilesystemCollection:
 type FilesystemNamespace* = object
   rootFs*: FilesystemRef
 
+type BlockDevMount* = object
+  dev*: File
+  offset*: int
+
 type Mount* = object
   path*: string
-  fs*: FilesystemRef
   persistent*: bool
+  readonly*: bool
+
+  fs*: FilesystemRef
+  blockDev*: BlockDevMount
 
 restRef MountRef:
   get() -> Mount

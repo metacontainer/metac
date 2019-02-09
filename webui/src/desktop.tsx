@@ -39,6 +39,9 @@ export class X11DesktopComponent extends React.Component<RefProps<X11Desktop>, {
         return (
             <div>
                 X11Desktop
+                <div>
+                    Display ID: {this.props.body.displayId}
+                </div>
                 <SomeRefComponent path={this.props.path + "desktop/"} />
             </div>
         );
