@@ -32,6 +32,8 @@ proc record*(conn: SctpConn, source: ByteInput, latency: int) {.async.} =
     await conn.sctpPackets.output.send(packet)
 
 proc play*(conn: SctpConn, dev: AudioSinkConcept, latency: int) {.async.} =
+  mixin getQueuedSize, pauseAudioDevice, clearQueuedAudio, queueAudio
+
   doAssert latency <= 1500
 
   const bytePerSample = 2 * channels

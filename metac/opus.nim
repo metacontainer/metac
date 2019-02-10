@@ -53,4 +53,4 @@ proc encode*(self: OpusEncoder, samples: Buffer): Buffer =
   if encodedSize < 0:
     raise newException(Exception, "opus_encode failed")
 
-  return outBuffer
+  return outBuffer.slice(0, encodedSize)

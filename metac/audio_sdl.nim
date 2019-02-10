@@ -16,6 +16,11 @@ proc clearQueuedAudio*(dev: AudioDeviceID): void {.importc: "SDL_ClearQueuedAudi
                                                    cdecl, dynlib: sdl2.LibName.}
 
 proc init() =
+  var initDone {.global.} = false
+
+  if initDone: return
+  initDone = true
+
   var driver = getenv("METAC_AUDIODRIVER")
   if driver == "":
     driver = "alsa"
@@ -43,11 +48,13 @@ proc openDevice*(info: AudioDeviceInfo): AudioDeviceID =
                                            if info.isSource: 1 else: 0, addr desired, addr obtained,
                                            allowed_changes=0)
   if dev < 2:
-    raise newException(Exception, "failed to open SDL audio device")
+    raise newException(Exception, "failed to open SDL audio device ($1)" % [$sdl2.getError()])
+
+  return dev
 
 proc queueAudio*(dev: AudioDeviceID, data: Buffer) =
   if queueAudio(dev, addr data[0], uint32(data.len)) != 0:
-    raise newException(Exception, "failed to queue audio")
+    raise newException(Exception, "failed to queue audio ($1)" % [$sdl2.getError()])
 
 proc getQueuedSize*(dev: AudioDeviceID): int =
   return getQueuedAudioSize(dev).int
