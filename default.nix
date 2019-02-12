@@ -23,6 +23,26 @@ gcc -fPIC -ftrapv -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=600 -D_BSD_SOURCE -o sftp-se
     installPhase = ''mkdir -p $out/bin; cp sftp-server $out/bin'';
   });
 
+  #qemu = callPackage (import ./nix/qemu.nix) {
+  #  inherit (darwin.apple_sdk.frameworks) CoreServices Cocoa;
+  #  inherit (darwin.stubs) rez setfile;
+#
+  #  gtkSupport = false;
+  #  pulseSupport = false;
+  #};
+
+  qemu = callPackage (import "${pkgs.repo}/pkgs/applications/virtualization/qemu") {
+    inherit (darwin.apple_sdk.frameworks) CoreServices Cocoa;
+    inherit (darwin.stubs) rez setfile;
+
+    gtkSupport = false;
+    pulseSupport = false;
+    openGLSupport = false;
+    hostCpuOnly = true;
+  };
+
+  agent = callPackage (import ./nix/agent.nix) {inherit nim metacFiltered nimArgsBase;};
+
   SDL2 = callPackage (import "${pkgs.repo}/pkgs/development/libraries/SDL2") {
     inherit (darwin.apple_sdk.frameworks) AudioUnit Cocoa CoreAudio CoreServices ForceFeedback OpenGL;
     openglSupport = false;
