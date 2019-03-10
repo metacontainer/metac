@@ -7,4 +7,7 @@ nimcache
 nimcache/
 /nimenv.local
 
+*.pyc
+.mypy_cache/
+
 /helpers/

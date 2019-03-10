@@ -23,20 +23,28 @@ type
     driver*: SerialPortDriver
     name*: string
     nowait*: bool
-    stream*: AfterLaunch[ByteStream]
+
+  VMFilesystemDriver* = enum
+    virtio9p
+
+  VmFilesystem* = object
+    driver*: VMFilesystemDriver
+    name*: string
+    fs*: FilesystemRef
 
   VmState* {.pure.} = enum
     running, turnedOff
 
   VM* = object
+    meta*: Metadata
     state*: VmState
-    name*: string
     memory*: int # in MiB
     vcpu*: int
 
     bootDisk*: Option[int]
     bootKernel*: Option[BootKernel]
     drives*: seq[Drive]
+    filesystems*: seq[VmFilesystem]
 
     serialPorts*: seq[SerialPort]
 

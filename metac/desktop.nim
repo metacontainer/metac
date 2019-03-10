@@ -39,10 +39,10 @@ restRef DesktopRef:
 
 type
   X11Desktop* = object
+    meta*: Metadata
     displayId*: Option[string]
     xauthorityPath*: Option[string]
     virtual*: bool
-    name*: string
 
 restRef X11DesktopRef:
   sub("desktop", DesktopRef)

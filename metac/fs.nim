@@ -1,8 +1,16 @@
-import xrest, metac/rest_common, metac/net, strutils
+import xrest, metac/rest_common, metac/net, strutils, collections
 
 type
   Filesystem* = object
     path*: string
+
+  FileEntry* = object
+    name*: string
+    isDirectory*: bool
+
+  FsListing* = object
+    isAccessible*: bool
+    entries*: seq[FileEntry]
 
   File* = object
     path*: string
@@ -13,6 +21,8 @@ restRef FileRef:
 
 restRef FilesystemRef:
   get() -> Filesystem
+  call("listing") -> FsListing
+  rawRequest("sub")
   sctpStream("sftpConnection")
 
 restRef FileCollection:
@@ -25,7 +35,7 @@ type FilesystemNamespace* = object
   rootFs*: FilesystemRef
 
 type BlockDevMount* = object
-  dev*: File
+  dev*: FileRef
   offset*: int
 
 type Mount* = object
@@ -33,8 +43,8 @@ type Mount* = object
   persistent*: bool
   readonly*: bool
 
-  fs*: FilesystemRef
-  blockDev*: BlockDevMount
+  fs*: Option[FilesystemRef]
+  blockDev*: Option[BlockDevMount]
 
 restRef MountRef:
   get() -> Mount

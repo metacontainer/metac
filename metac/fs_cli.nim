@@ -1,4 +1,4 @@
-import reactor, collections, metac/fs, metac/cli_utils, metac/fs_impl, metac/service_common, os
+import reactor, collections, metac/fs, metac/cli_utils, metac/fs_impl, metac/service_common, os, sctp
 
 command("metac fs mount", proc(srcRPath: string, dstPath: string, noDaemon=false, mountCollectionRPath="")):
   var dstPath = absolutePath(dstPath)
@@ -16,6 +16,14 @@ command("metac fs mount", proc(srcRPath: string, dstPath: string, noDaemon=false
       MountCollection)
     let r = await mountCollection.create(Mount(
       path: dstPath,
-      fs: fs
+      fs: some(fs)
     ))
     echo r
+
+command("metac fs cat", proc(rpath: string)):
+  let f = await getRefForPath(expandResourcePath(rpath), FileRef)
+  let conn = await f.data
+  let stdout = createOutputFromFd(1)
+
+  await pipe(conn, stdout)
+  conn.sctpPackets.input.recvClose

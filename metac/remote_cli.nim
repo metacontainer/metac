@@ -9,7 +9,7 @@ command("metac exported ls", proc()):
 command("metac export", proc(path: string, description="")):
   let service = await getServiceRestRef("exported", ExportedCollection)
   let resp = await service.create(Exported(
-    localUrl: path,
+    localUrl: expandResourcePath(path),
     description: description
   ))
   echo resp

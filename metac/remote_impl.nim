@@ -174,6 +174,7 @@ proc `get`(r: RemoteServiceImpl): Future[seq[ExportedRef]] {.async.} =
   return toSeq(r.db.keys).mapIt(makeRef(ExportedRef, it))
 
 proc `resolve`(r: RemoteServiceImpl, origUrl: string): Future[string] {.async.} =
+  echo "resolve ", origUrl
   return origUrl
 
 proc `item/get`(r: RemoteServiceImpl, id: string): Future[Exported] {.async.} =

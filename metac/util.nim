@@ -37,4 +37,4 @@ proc copyToTemp*(s: ByteStream, maxLength=100 * 1024 * 1024): Future[tuple[path:
     cleanup()
     await r
 
-  return (dirPath, cleanup)
+  return (filePath, cleanup)

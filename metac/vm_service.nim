@@ -1,4 +1,4 @@
-import xrest, metac/vm, metac/fs, strutils, metac/service_common, metac/rest_common, metac/os_fs, posix, reactor/unix, reactor/process, options, metac/util, collections, metac/flatdb, metac/desktop_impl, metac/desktop, metac/media
+import xrest, metac/vm, metac/fs, strutils, metac/service_common, metac/rest_common, metac/os_fs, posix, reactor/unix, reactor/process, options, metac/util, collections, metac/flatdb, metac/desktop_impl, metac/desktop, metac/media, metac/fs_client_util
 
 {.reorder: on.}
 
@@ -59,6 +59,7 @@ proc launchVm(config: VM): Future[VMImpl] {.async.} =
   block qmp:
     let (dirPath, cleanup) = createUnixSocketDir()
     let path = dirPath & "/socket"
+    vm.cleanupProcs.add cleanup
 
     vm.qmpSocketPath = path
 
@@ -88,6 +89,17 @@ proc launchVm(config: VM): Future[VMImpl] {.async.} =
       vm.cleanupProcs.add cleanup2
   else:
     raise newException(Exception, "missing boot field")
+
+  # filesystems
+
+  for i, vmFilesystem in config.filesystems:
+    let (path, cleanup) = await getLocalPathOrMount(vmFilesystem.fs)
+
+    cmdline &= [
+      "-fsdev", "local,security_model=passthrough,id=fsdev$1,path=$2" % [$i, path],
+      "-device", "virtio-9p-pci,id=fs$1,fsdev=fsdev$1,mount_tag=$2" % [$i, qemuQuoteName(vmFilesystem.name)]
+    ]
+    vm.cleanupProcs.add cleanup
 
   # rng
   cmdline &= ["-device", "virtio-rng-pci"]
@@ -162,12 +174,14 @@ proc launchVm(config: VM): Future[VMImpl] {.async.} =
   return vm
 
 proc get(self: VMServiceImpl): seq[VMRef] =
-  return toSeq(self.db.keys).mapIt(makeRef(VMRef, it))
+  return toSeq(self.vms.keys).mapIt(makeRef(VMRef, it))
 
 proc create(self: VMServiceImpl, config: VM): Future[VMRef] {.async.} =
   let vm = await launchVm(config)
   self.vms[vm.id] = vm
-  return makeRef(VMRef, "./" & vm.id)
+  # self.db[id] = toJson(self.vms[id].config)
+
+  return makeRef(VMRef, vm.id)
 
 proc `item/get`(self: VMServiceImpl, id: string): Future[VM] =
   return self.vms[id].get
