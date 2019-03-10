@@ -12,6 +12,10 @@ export interface RefProps<T> {
     body: T;
 }
 
+export interface Metadata {
+    name: string;
+};
+
 var components: {[id: string]:(props: any)=>any;} = {}
 
 export function registerMetacComponent(name: string, func: (props: any)=>any) {

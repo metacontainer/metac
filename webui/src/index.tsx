@@ -23,6 +23,6 @@ const AppRouter = () => (
 )
 
 ReactDOM.render(
-    AppRouter(),//<AppRouter compiler="TypeScript" framework="React" />,
+    AppRouter(),
     document.getElementById("body")
 );
