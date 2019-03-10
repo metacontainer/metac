@@ -1,7 +1,7 @@
 import requests
 from . import unix_http
 from mypy_extensions import TypedDict
-from typing import TypeVar, List, Generic, NamedTuple, no_type_check, Union
+from typing import TypeVar, List, Generic, NamedTuple, no_type_check, Union, Iterator
 from enum import Enum
 
 T = TypeVar('T')
@@ -63,8 +63,15 @@ def get_session():
 class Ctx(NamedTuple):
     base_rpath: str
 
-def deserialize_resp(ref, resp, T):
+class MetacException(Exception): pass
+
+def raise_for_status(resp):
+    if resp.status_code == 500 and resp.headers.get('content-type') == 'application/json':
+        raise MetacException(resp.json().get('message'))
     resp.raise_for_status()
+
+def deserialize_resp(ref, resp, T):
+    raise_for_status(resp)
     ctx = Ctx(ref.rpath)
     return deserialize_json(ctx, resp.json(), T)
 
@@ -111,6 +118,9 @@ class CollectionMixin(Generic[T, R]):
 
     def values(self) -> List[R]:
         return deserialize_resp(self, get_session().get(self.url), List[self.ref_type]) # type: ignore
+
+    def __iter__(self) -> Iterator[R]:
+        return iter(self.values())
 
     def create(self, v: T) -> R:
         return deserialize_resp(

@@ -1,7 +1,7 @@
 from metac.core import *
 from typing import NamedTuple, Optional
 from enum import Enum
-import urllib.parse
+import urllib.parse, os
 
 class FileRef(Ref):
     pass
@@ -34,10 +34,10 @@ class FilesystemNamespaceRef(Ref):
         return MountCollection(self.rpath + 'mounts/')
 
 def get_file(path):
-    return FileRef('/fs/file/%s/' % urllib.parse.quote(path, safe=''))
+    return FileRef('/fs/file/%s/' % urllib.parse.quote(os.path.realpath(path), safe=''))
 
 def get_fs(path):
-    return FilesystemRef('/fs/fs/%s/' % urllib.parse.quote(path, safe=''))
+    return FilesystemRef('/fs/fs/%s/' % urllib.parse.quote(os.path.realpath(path), safe=''))
 
 def get_mounts():
     return MountCollection('/fs/mounts/')

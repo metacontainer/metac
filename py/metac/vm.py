@@ -13,8 +13,8 @@ class Drive(NamedTuple):
 
 class BootKernel(NamedTuple):
     kernel: Ref
-    initrd: Optional[Ref]
     cmdline: str
+    initrd: Optional[Ref] = None
 
 class SerialPortDriver(Enum):
     default = 1
@@ -25,19 +25,19 @@ class SerialPort(NamedTuple):
     name: str
     nowait: bool
 
-class VMFilesystemDriver(Enum):
+class VmFilesystemDriver(Enum):
     virtio9p = 1
 
 class VmFilesystem(NamedTuple):
-    driver: VMFilesystemDriver
     name: str
     fs: FilesystemRef
+    driver: VmFilesystemDriver = VmFilesystemDriver.virtio9p
 
 class VmState(Enum):
     running = 1
     turnedOff = 2
 
-class VM(NamedTuple):
+class Vm(NamedTuple):
     meta: Metadata
     memory: int
     state: VmState = VmState.running
@@ -50,19 +50,19 @@ class VM(NamedTuple):
 
     serialPorts: List[SerialPort] = []
 
-class VMRef(Ref, GetMixin[VM], DeleteMixin):
-    value_type = VM
+class VmRef(Ref, GetMixin[Vm], DeleteMixin):
+    value_type = Vm
 
-class VMCollection(Ref, CollectionMixin[VM, VMRef]):
-    value_type = VM
-    ref_type = VMRef
+class VmCollection(Ref, CollectionMixin[Vm, VmRef]):
+    value_type = Vm
+    ref_type = VmRef
 
-def get_vms() -> VMCollection:
-    return VMCollection('/vm/')
+def get_vms() -> VmCollection:
+    return VmCollection('/vm/')
 
 if __name__ == '__main__':
     vms = get_vms().values()
-    get_vms().create(VM(
+    get_vms().create(Vm(
         meta=Metadata(name='hello'),
         memory=1024,
     ))
