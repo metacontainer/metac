@@ -16,20 +16,12 @@ rec {
 
   sftpServer = pkgs.openssh.overrideDerivation (attrs: rec {
     name = "sftp-server";
-    buildInputs = attrs.buildInputs ++ [stdenv.glibc.static];
+    buildInputs = attrs.buildInputs;
     # (???) TODO: do dynamic linking (patchelf fails on PIC executables)
     buildPhase = ''make CFLAGS='-fPIC' libssh.a ./openbsd-compat/libopenbsd-compat.a
 gcc -fPIC -ftrapv -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=600 -D_BSD_SOURCE -o sftp-server ${./metac/sftp-server.c} sftp-common.c -Lopenbsd-compat -L. -I.  -fstack-protector-strong -lssh -lopenbsd-compat  -Wl,--gc-sections'';
     installPhase = ''mkdir -p $out/bin; cp sftp-server $out/bin'';
   });
-
-  #qemu = callPackage (import ./nix/qemu.nix) {
-  #  inherit (darwin.apple_sdk.frameworks) CoreServices Cocoa;
-  #  inherit (darwin.stubs) rez setfile;
-#
-  #  gtkSupport = false;
-  #  pulseSupport = false;
-  #};
 
   qemu = callPackage (import "${pkgs.repo}/pkgs/applications/virtualization/qemu") {
     inherit (darwin.apple_sdk.frameworks) CoreServices Cocoa;

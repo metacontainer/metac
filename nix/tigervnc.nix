@@ -37,7 +37,7 @@ stdenv.mkDerivation rec {
         --disable-xorg --disable-xnest --disable-xvfb --disable-dmx \
         --disable-xwin --disable-xephyr --disable-kdrive --with-pic \
         --disable-xorgcfg --disable-xprint --disable-static \
-        --disable-composite --disable-xtrap --enable-xcsecurity \
+        --enable-composite --disable-xtrap --enable-xcsecurity \
         --disable-{a,c,m}fb \
         --disable-xwayland \
         --disable-config-dbus --disable-config-udev --disable-config-hal \
@@ -71,10 +71,11 @@ stdenv.mkDerivation rec {
     fontsproto videoproto scrnsaverproto resourceproto presentproto
     utilmacros libXtst libXext libX11 libXext libICE libXi libSM libXft
     libxkbfile libXfont2 libpciaccess xineramaproto
-    glproto mesa_glu
+    glproto libGLU
   ] ++ xorgserver.buildInputs;
 
-  nativeBuildInputs = [ cmake zlib gettext libtool ] ++ xorg.xorgserver.nativeBuildInputs;
+  nativeBuildInputs = with xorg; [ cmake zlib gettext libtool utilmacros fontutil makeWrapper ]
+    ++ xorg.xorgserver.nativeBuildInputs;
 
   propagatedNativeBuildInputs = xorg.xorgserver.propagatedNativeBuildInputs;
 
